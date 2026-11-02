@@ -1,0 +1,6 @@
+{
+  "name": "TraceCraft — Algorithmic Memory & Pointer Visualizer",
+  "description": "Next-generation software engineering interview preparation platform featuring step-by-step memory allocation & pointer visualization, Python and Java execution traces, a 50+ top tech firm question bank, and real-time Gemini AI tutoring.",
+  "requestFramePermissions": ["microphone"],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
