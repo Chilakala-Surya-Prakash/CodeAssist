@@ -27,6 +27,37 @@ function getGenAIClient(): GoogleGenAI {
   });
 }
 
+async function generateWithFallback(
+  ai: GoogleGenAI,
+  params: { contents: string; config?: Record<string, any> }
+) {
+  const candidateModels = [
+    'gemini-3.8-flash',
+    'gemini-flash-latest',
+    'gemini-3.1-flash-lite',
+  ];
+  let lastError: any = null;
+
+  for (const model of candidateModels) {
+    try {
+      return await ai.models.generateContent({
+        model,
+        contents: params.contents,
+        config: params.config,
+      });
+    } catch (err: any) {
+      lastError = err;
+      const status = err?.status || err?.code;
+      // Retry on 503 Unavailable or 429 Rate Limit
+      if (status === 503 || status === 429 || String(err?.message || '').includes('503')) {
+        continue;
+      }
+      throw err;
+    }
+  }
+  throw lastError;
+}
+
 const syncVisualizerStepTool: FunctionDeclaration = {
   name: 'syncVisualizerStep',
   description:
@@ -50,9 +81,19 @@ const syncVisualizerStepTool: FunctionDeclaration = {
 async function startServer() {
   const app = express();
   const server = http.createServer(app);
-  const PORT = 3000;
+  const PORT = Number(process.env.PORT) || 3000;
 
   app.use(express.json({ limit: '1mb' }));
+
+  // 0. Production Health Check Endpoint
+  app.get('/api/health', (_req, res) => {
+    res.json({
+      status: 'ok',
+      service: 'tracecraft-api',
+      geminiConfigured: Boolean(process.env.GEMINI_API_KEY),
+      timestamp: new Date().toISOString(),
+    });
+  });
 
   // 1. Real-time Personalized AI Tutor Endpoint (Text Chat)
   app.post('/api/tutor/chat', async (req, res) => {
@@ -97,8 +138,7 @@ ${stepSummary}
 ${recentHistory ? `Recent Conversation:\n${recentHistory}\n\n` : ''}Student Question:
 ${message}`;
 
-      const response = await ai.models.generateContent({
-        model: 'gemini-3.8-flash',
+      const response = await generateWithFallback(ai, {
         contents: prompt,
         config: {
           systemInstruction:
@@ -130,8 +170,7 @@ ${message}`;
       }
 
       const ai = getGenAIClient();
-      const response = await ai.models.generateContent({
-        model: 'gemini-3.8-flash',
+      const response = await generateWithFallback(ai, {
         contents: `Trace the execution of the following ${language || 'Python'} code step-by-step on input "${customInput || 'default'}".
 Problem: ${problemTitle || 'Custom Algorithm'}
 Code:

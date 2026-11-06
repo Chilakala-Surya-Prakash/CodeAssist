@@ -1,6 +1,16 @@
-export type Language = 'python' | 'java';
+export type Language = 'python' | 'java' | 'cpp' | 'go' | 'typescript' | 'rust';
 
 export type Difficulty = 'Easy' | 'Medium' | 'Hard';
+
+export type CoreTopic =
+  | 'Arrays'
+  | 'Linked Lists'
+  | 'Dynamic Programming'
+  | 'Greedy'
+  | 'Sliding Window'
+  | 'Stacks & Queues'
+  | 'Trees & Heaps'
+  | 'Graphs & Search';
 
 export type AlgorithmPattern =
   | 'Two Pointers'
@@ -11,7 +21,8 @@ export type AlgorithmPattern =
   | 'Trees & Graphs'
   | 'Dynamic Programming'
   | 'Heap & Priority Queue'
-  | 'Backtracking & Tries';
+  | 'Backtracking & Tries'
+  | CoreTopic;
 
 export interface StackVariable {
   name: string;
@@ -104,7 +115,11 @@ export interface ProblemSolution {
 
 export interface AlgorithmProblem {
   id: string;
-  number: number;
+  number: number; // Sequential 1..160
+  topicCode?: string; // Authentic topic code e.g. ARR-01 .. ARR-20
+  topic?: CoreTopic;
+  topicIndex?: number; // 1..20 within topic
+  traceFamilyId?: string; // Underlying trace archetype id
   title: string;
   slug: string;
   difficulty: Difficulty;

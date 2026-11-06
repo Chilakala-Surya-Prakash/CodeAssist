@@ -30,7 +30,7 @@ export const TutorDrawer: React.FC<TutorDrawerProps> = ({
     {
       id: 'welcome',
       role: 'assistant',
-      content: `Welcome to TraceCraft Academic Tutoring. We are currently inspecting **${problem.title}** (${language.toUpperCase()}) at Step ${currentStep.stepIndex + 1}/${totalSteps}. You can ask questions in text OR switch to **Gemini Live Voice Mode** for real-time spoken explanations synchronized with the visualization on your screen.`,
+      content: `TraceCraft Academic Mentor ready. Inspecting **${problem.title}** (${language.toUpperCase()}) at Step ${currentStep.stepIndex + 1}/${totalSteps}. Ask a question below or start Live Voice Mode for spoken walkthroughs synchronized with the memory visualizer.`,
       timestamp: 'Ready',
     },
   ]);
@@ -60,6 +60,9 @@ export const TutorDrawer: React.FC<TutorDrawerProps> = ({
   }, [currentStep]);
 
   const stopLiveVoice = () => {
+    if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
+      window.speechSynthesis.cancel();
+    }
     if (processorRef.current) {
       processorRef.current.disconnect();
       processorRef.current = null;
@@ -82,7 +85,7 @@ export const TutorDrawer: React.FC<TutorDrawerProps> = ({
     }
     setIsMicStreaming(false);
     setIsLiveVoiceActive(false);
-    setLiveStatus('Disconnected');
+    setLiveStatus('Idle');
   };
 
   useEffect(() => {
@@ -90,6 +93,28 @@ export const TutorDrawer: React.FC<TutorDrawerProps> = ({
       stopLiveVoice();
     };
   }, []);
+
+  // Fallback spoken narration for serverless deployments (e.g., Vercel) where raw WebSockets are unavailable
+  const runServerlessVoiceFallback = () => {
+    const step = currentStepRef.current;
+    const pointerText =
+      step.pointers.length > 0
+        ? `Active pointers: ${step.pointers.map((p) => `${p.name} at ${p.targetAddress}`).join(', ')}.`
+        : '';
+    const spokenText = `Step ${step.stepIndex + 1} of ${totalSteps}: ${step.title}. ${step.intuition} ${pointerText} Memory mutation: ${step.memoryMutation}`;
+    setLiveTranscript(spokenText);
+
+    if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
+      window.speechSynthesis.cancel();
+      const utterance = new SpeechSynthesisUtterance(spokenText);
+      utterance.rate = 1.02;
+      utterance.onstart = () => setLiveStatus('Voice Narration Active');
+      utterance.onend = () => setLiveStatus('Idle');
+      window.speechSynthesis.speak(utterance);
+    } else {
+      setLiveStatus('Transcript Ready');
+    }
+  };
 
   const connectLiveVoiceSession = (autoNarrateCurrentStep = false) => {
     if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
@@ -100,7 +125,7 @@ export const TutorDrawer: React.FC<TutorDrawerProps> = ({
     }
 
     setIsLiveVoiceActive(true);
-    setLiveStatus('Connecting to Gemini Live Voice...');
+    setLiveStatus('Connecting to Live Voice...');
     setLiveTranscript('');
 
     audioPlayerRef.current = new LiveAudioPlayer();
@@ -108,7 +133,10 @@ export const TutorDrawer: React.FC<TutorDrawerProps> = ({
     const ws = new WebSocket(`${proto}//${window.location.host}/api/live`);
     wsRef.current = ws;
 
+    let connectedOnce = false;
+
     ws.onopen = () => {
+      connectedOnce = true;
       const step = currentStepRef.current;
       const context = `Current Problem: ${problem.title} (${language}). Step ${step.stepIndex + 1} of ${totalSteps}: ${step.title}. Intuition: ${step.intuition}. Memory Mutation: ${step.memoryMutation}.`;
       ws.send(JSON.stringify({ type: 'init', context }));
@@ -118,7 +146,7 @@ export const TutorDrawer: React.FC<TutorDrawerProps> = ({
       try {
         const data = JSON.parse(event.data);
         if (data.status === 'connected') {
-          setLiveStatus('Gemini Live Voice Active (24kHz PCM)');
+          setLiveStatus('Live Voice Active (24kHz PCM)');
           if (autoNarrateCurrentStep) {
             sendVoiceNarrationPrompt();
           }
@@ -139,14 +167,28 @@ export const TutorDrawer: React.FC<TutorDrawerProps> = ({
           }
         }
         if (data.error) {
-          setLiveStatus(`Voice Error: ${data.error}`);
+          if (autoNarrateCurrentStep) {
+            runServerlessVoiceFallback();
+          } else {
+            setLiveStatus(`Voice Error: ${data.error}`);
+          }
         }
       } catch {
         // ignore malformed frame
       }
     };
 
+    ws.onerror = () => {
+      if (!connectedOnce && autoNarrateCurrentStep) {
+        runServerlessVoiceFallback();
+      }
+    };
+
     ws.onclose = () => {
+      if (!connectedOnce && autoNarrateCurrentStep) {
+        runServerlessVoiceFallback();
+        return;
+      }
       setIsLiveVoiceActive(false);
       setIsMicStreaming(false);
       setLiveStatus('Idle');
@@ -160,7 +202,10 @@ export const TutorDrawer: React.FC<TutorDrawerProps> = ({
   }, [voiceTriggerCount, isOpen]);
 
   const sendVoiceNarrationPrompt = () => {
-    if (!wsRef.current || wsRef.current.readyState !== WebSocket.OPEN) return;
+    if (!wsRef.current || wsRef.current.readyState !== WebSocket.OPEN) {
+      runServerlessVoiceFallback();
+      return;
+    }
     const step = currentStepRef.current;
     setLiveTranscript('');
     wsRef.current.send(
@@ -175,7 +220,7 @@ export const TutorDrawer: React.FC<TutorDrawerProps> = ({
       if (processorRef.current) processorRef.current.disconnect();
       if (micStreamRef.current) micStreamRef.current.getTracks().forEach((t) => t.stop());
       setIsMicStreaming(false);
-      setLiveStatus('Gemini Live Connected (Mic Muted)');
+      setLiveStatus('Live Connected (Mic Muted)');
       return;
     }
 
@@ -203,9 +248,9 @@ export const TutorDrawer: React.FC<TutorDrawerProps> = ({
       };
 
       setIsMicStreaming(true);
-      setLiveStatus('Listening (16kHz PCM Mic) & Speaking (24kHz Live Audio)');
+      setLiveStatus('Listening (16kHz PCM) & Speaking (24kHz Audio)');
     } catch (err: any) {
-      setLiveStatus(`Microphone access unavailable: ${err?.message || 'Permission denied'}`);
+      setLiveStatus(`Microphone unavailable: ${err?.message || 'Permission denied'}`);
     }
   };
 
@@ -262,7 +307,7 @@ export const TutorDrawer: React.FC<TutorDrawerProps> = ({
         {
           id: `err-${Date.now()}`,
           role: 'assistant',
-          content: `Note: ${err?.message || 'Unable to connect to Gemini server.'}`,
+          content: `Note: ${err?.message || 'Unable to connect to tutor endpoint.'}`,
           timestamp: 'System',
         },
       ]);
@@ -275,45 +320,51 @@ export const TutorDrawer: React.FC<TutorDrawerProps> = ({
 
   return (
     <aside
-      aria-label="Gemini AI Tutor and Live Voice Mode Panel"
-      className="fixed inset-y-0 right-0 z-50 w-full sm:w-[420px] bg-white dark:bg-[#0F1522] border-l border-slate-200 dark:border-slate-800 shadow-2xl flex flex-col"
+      aria-label="AI Tutor and Live Voice Mode Panel"
+      className="fixed inset-y-0 right-0 z-50 w-full sm:w-[420px] bg-white dark:bg-[#111111] border-l border-neutral-200 dark:border-neutral-800 shadow-2xl flex flex-col"
     >
       {/* Header */}
-      <div className="px-4 py-3.5 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between">
+      <div className="px-4 py-3.5 border-b border-neutral-200 dark:border-neutral-800 flex items-center justify-between">
         <div>
-          <div className="text-xs font-mono text-sky-600 dark:text-sky-400">
-            Gemini 3.8 Live Voice &amp; Academic Tutor
+          <div className="text-xs font-mono text-neutral-500 dark:text-neutral-400">
+            Live Voice &amp; Academic Tutor
           </div>
-          <h3 className="text-sm font-bold text-slate-900 dark:text-slate-100">
-            Real-Time Personalized Mentor
+          <h3 className="text-sm font-bold text-neutral-950 dark:text-neutral-100">
+            Real-Time Engineering Mentor
           </h3>
         </div>
         <button
           type="button"
           onClick={onClose}
           aria-label="Close AI Tutor panel"
-          className="p-1.5 rounded-lg text-slate-500 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
+          className="p-1.5 rounded-md text-neutral-500 hover:text-neutral-950 dark:hover:text-white hover:bg-neutral-100 dark:hover:bg-neutral-800 transition-colors"
         >
           <X className="w-4 h-4" />
         </button>
       </div>
 
-      {/* Gemini Live Native Voice Mode Deck (Synchronized with Screen Visualization) */}
-      <div className="p-4 border-b border-slate-200 dark:border-slate-800 bg-slate-50/80 dark:bg-slate-900/60 space-y-3">
+      {/* Live Voice Mode Deck */}
+      <div className="p-4 border-b border-neutral-200 dark:border-neutral-800 bg-neutral-50 dark:bg-neutral-900/60 space-y-3">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <Radio className={`w-4 h-4 ${isLiveVoiceActive ? 'text-sky-500' : 'text-slate-400'}`} />
-            <span className="text-xs font-semibold text-slate-900 dark:text-slate-100">
-              Gemini Live Native Voice Mode
+            <Radio
+              className={`w-4 h-4 ${
+                isLiveVoiceActive
+                  ? 'text-neutral-950 dark:text-white'
+                  : 'text-neutral-400'
+              }`}
+            />
+            <span className="text-xs font-semibold text-neutral-950 dark:text-neutral-100">
+              Live Voice Mode
             </span>
           </div>
-          <span className="text-[11px] font-mono text-slate-500 dark:text-slate-400">
+          <span className="text-[11px] font-mono text-neutral-500 dark:text-neutral-400">
             {liveStatus}
           </span>
         </div>
 
-        <p className="text-xs text-slate-600 dark:text-slate-400 leading-relaxed">
-          Streams native 24kHz PCM voice directly from <code className="font-mono">gemini-3.8-live</code> while stepping the pointer visualization on screen.
+        <p className="text-xs text-neutral-600 dark:text-neutral-400 leading-relaxed">
+          Streams real-time voice explanations synchronized with the active pointer and memory state on screen.
         </p>
 
         <div className="flex flex-wrap items-center gap-2">
@@ -326,19 +377,19 @@ export const TutorDrawer: React.FC<TutorDrawerProps> = ({
                 connectLiveVoiceSession(true);
               }
             }}
-            className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 text-xs font-medium rounded-lg bg-sky-600 hover:bg-sky-500 text-white transition-colors whitespace-nowrap shrink-0"
+            className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 text-xs font-medium rounded-md bg-neutral-900 hover:bg-neutral-800 dark:bg-neutral-100 dark:hover:bg-white text-white dark:text-neutral-950 transition-colors whitespace-nowrap shrink-0"
           >
             <Volume2 className="w-3.5 h-3.5" />
-            Explain Current Step in Live Voice
+            Explain Step in Voice
           </button>
 
           <button
             type="button"
             onClick={toggleMicrophoneStreaming}
-            className={`px-3 py-2 text-xs font-medium rounded-lg border transition-colors flex items-center gap-1.5 whitespace-nowrap shrink-0 ${
+            className={`px-3 py-2 text-xs font-medium rounded-md border transition-colors flex items-center gap-1.5 whitespace-nowrap shrink-0 ${
               isMicStreaming
-                ? 'border-rose-500 bg-rose-500/15 text-rose-600 dark:text-rose-400'
-                : 'border-slate-300 dark:border-slate-700 text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800'
+                ? 'border-neutral-900 bg-neutral-900 text-white dark:border-neutral-100 dark:bg-neutral-100 dark:text-neutral-950'
+                : 'border-neutral-300 dark:border-neutral-700 text-neutral-700 dark:text-neutral-300 hover:bg-neutral-100 dark:hover:bg-neutral-800'
             }`}
           >
             {isMicStreaming ? <MicOff className="w-3.5 h-3.5" /> : <Mic className="w-3.5 h-3.5" />}
@@ -349,7 +400,7 @@ export const TutorDrawer: React.FC<TutorDrawerProps> = ({
             <button
               type="button"
               onClick={stopLiveVoice}
-              className="px-2.5 py-2 text-xs font-medium rounded-lg border border-slate-300 dark:border-slate-700 text-slate-500 hover:text-slate-900 dark:hover:text-white"
+              className="px-2.5 py-2 text-xs font-medium rounded-md border border-neutral-300 dark:border-neutral-700 text-neutral-500 hover:text-neutral-950 dark:hover:text-white"
             >
               Stop
             </button>
@@ -357,9 +408,9 @@ export const TutorDrawer: React.FC<TutorDrawerProps> = ({
         </div>
 
         {liveTranscript && (
-          <div className="p-2.5 rounded-lg bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-800 text-xs text-slate-700 dark:text-slate-300 max-h-28 overflow-y-auto">
-            <div className="text-[10px] font-mono text-sky-500 mb-1">
-              Live Voice Stream Transcript:
+          <div className="p-2.5 rounded-md bg-white dark:bg-neutral-950 border border-neutral-200 dark:border-neutral-800 text-xs text-neutral-700 dark:text-neutral-300 max-h-28 overflow-y-auto">
+            <div className="text-[10px] font-mono text-neutral-500 mb-1">
+              Voice Transcript:
             </div>
             {liveTranscript}
           </div>
@@ -367,7 +418,7 @@ export const TutorDrawer: React.FC<TutorDrawerProps> = ({
       </div>
 
       {/* Quick Pedagogical Prompts */}
-      <div className="px-4 py-2.5 border-b border-slate-200 dark:border-slate-800 flex flex-wrap gap-1.5">
+      <div className="px-4 py-2.5 border-b border-neutral-200 dark:border-neutral-800 flex flex-wrap gap-1.5">
         <button
           type="button"
           onClick={() =>
@@ -375,7 +426,7 @@ export const TutorDrawer: React.FC<TutorDrawerProps> = ({
               `Explain why the pointer mutation at Step ${currentStep.stepIndex + 1} (${currentStep.title}) preserves the loop invariant.`
             )
           }
-          className="px-2.5 py-1 text-[11px] font-medium rounded-md border border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-300 hover:border-sky-500 transition-colors"
+          className="px-2.5 py-1 text-[11px] font-medium rounded border border-neutral-200 dark:border-neutral-800 text-neutral-600 dark:text-neutral-300 hover:border-neutral-900 dark:hover:border-neutral-300 transition-colors"
         >
           Why this pointer move?
         </button>
@@ -386,7 +437,7 @@ export const TutorDrawer: React.FC<TutorDrawerProps> = ({
               `Compare the heap memory layout of ${problem.title} in Python vs Java.`
             )
           }
-          className="px-2.5 py-1 text-[11px] font-medium rounded-md border border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-300 hover:border-sky-500 transition-colors"
+          className="px-2.5 py-1 text-[11px] font-medium rounded border border-neutral-200 dark:border-neutral-800 text-neutral-600 dark:text-neutral-300 hover:border-neutral-900 dark:hover:border-neutral-300 transition-colors"
         >
           Python vs Java Memory
         </button>
@@ -397,7 +448,7 @@ export const TutorDrawer: React.FC<TutorDrawerProps> = ({
               `What edge cases (like NULL head or 1-element input) should I mention in my interview for ${problem.title}?`
             )
           }
-          className="px-2.5 py-1 text-[11px] font-medium rounded-md border border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-300 hover:border-sky-500 transition-colors"
+          className="px-2.5 py-1 text-[11px] font-medium rounded border border-neutral-200 dark:border-neutral-800 text-neutral-600 dark:text-neutral-300 hover:border-neutral-900 dark:hover:border-neutral-300 transition-colors"
         >
           Interview Edge Cases
         </button>
@@ -408,21 +459,21 @@ export const TutorDrawer: React.FC<TutorDrawerProps> = ({
         {messages.map((msg) => (
           <div
             key={msg.id}
-            className={`p-3 rounded-xl text-xs leading-relaxed ${
+            className={`p-3 rounded-lg text-xs leading-relaxed ${
               msg.role === 'user'
-                ? 'bg-sky-600 text-white ml-6'
-                : 'bg-slate-100 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-slate-800 dark:text-slate-200 mr-4'
+                ? 'bg-neutral-900 text-white dark:bg-neutral-100 dark:text-neutral-950 ml-6'
+                : 'bg-neutral-100 dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 text-neutral-800 dark:text-neutral-200 mr-4'
             }`}
           >
             <div className="flex items-center justify-between text-[10px] font-mono opacity-75 mb-1">
-              <span>{msg.role === 'user' ? 'You' : 'TraceCraft AI Mentor'}</span>
+              <span>{msg.role === 'user' ? 'You' : 'TraceCraft Mentor'}</span>
               <span>{msg.timestamp}</span>
             </div>
             <div className="whitespace-pre-wrap">{msg.content}</div>
           </div>
         ))}
         {isLoading && (
-          <div className="p-3 rounded-xl bg-slate-100 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-xs text-slate-500 font-mono">
+          <div className="p-3 rounded-lg bg-neutral-100 dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 text-xs text-neutral-500 font-mono">
             Analyzing stack &amp; heap state at Step {currentStep.stepIndex + 1}...
           </div>
         )}
@@ -434,7 +485,7 @@ export const TutorDrawer: React.FC<TutorDrawerProps> = ({
           e.preventDefault();
           sendTextMessage();
         }}
-        className="p-3 border-t border-slate-200 dark:border-slate-800 flex items-center gap-2"
+        className="p-3 border-t border-neutral-200 dark:border-neutral-800 flex items-center gap-2"
       >
         <input
           type="text"
@@ -442,13 +493,13 @@ export const TutorDrawer: React.FC<TutorDrawerProps> = ({
           onChange={(e) => setInput(e.target.value)}
           placeholder="Ask about pointers, memory, or complexity..."
           aria-label="Ask AI Tutor a question"
-          className="flex-1 px-3 py-2 text-xs rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 text-slate-900 dark:text-slate-100 focus:outline-none focus:border-sky-500"
+          className="flex-1 px-3 py-2 text-xs rounded-md border border-neutral-300 dark:border-neutral-700 bg-neutral-50 dark:bg-neutral-900 text-neutral-900 dark:text-neutral-100 focus:outline-none focus:border-neutral-900 dark:focus:border-neutral-300"
         />
         <button
           type="submit"
           disabled={isLoading || !input.trim()}
           aria-label="Send question to AI Tutor"
-          className="p-2 rounded-lg bg-slate-900 dark:bg-sky-600 hover:bg-slate-800 dark:hover:bg-sky-500 disabled:opacity-50 text-white transition-colors"
+          className="p-2 rounded-md bg-neutral-900 dark:bg-neutral-100 hover:bg-neutral-800 dark:hover:bg-white disabled:opacity-50 text-white dark:text-neutral-950 transition-colors"
         >
           <Send className="w-3.5 h-3.5" />
         </button>

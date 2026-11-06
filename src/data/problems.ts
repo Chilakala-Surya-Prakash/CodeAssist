@@ -1,6 +1,9 @@
 import { AlgorithmProblem } from '../types/visualizer';
+import { buildFullTopicCurriculum, CORE_TOPICS } from './topicCurriculum';
 
-export const PROBLEMS: AlgorithmProblem[] = [
+export { CORE_TOPICS };
+
+const BASE_PROBLEMS: AlgorithmProblem[] = [
   {
     id: 'reverse-linked-list',
     number: 206,
@@ -32,12 +35,7 @@ export const PROBLEMS: AlgorithmProblem[] = [
     pointerMechanicsNote:
       'Three stack pointers (prev, curr, nxt) march in lockstep: (1) nxt = curr.next saves the forward link, (2) curr.next = prev flips the heap arrow 180 degrees, (3) prev = curr and curr = nxt advance the frontier.',
     python: {
-      code: `class ListNode:
-    def __init__(self, val=0, next=None):
-        self.val = val
-        self.next = next
-
-def reverseList(head: ListNode) -> ListNode:
+      code: `def reverseList(head: ListNode) -> ListNode:
     prev = None
     curr = head
     while curr is not None:
@@ -51,18 +49,16 @@ def reverseList(head: ListNode) -> ListNode:
       memoryProfileNote: 'Zero heap allocations during execution; mutates 8-byte .next reference fields in-place.'
     },
     java: {
-      code: `public class Solution {
-    public ListNode reverseList(ListNode head) {
-        ListNode prev = null;
-        ListNode curr = head;
-        while (curr != null) {
-            ListNode nxt = curr.next; // Save forward node address
-            curr.next = prev;         // Flip node reference backward
-            prev = curr;              // Step prev reference forward
-            curr = nxt;               // Step curr reference forward
-        }
-        return prev;
+      code: `public ListNode reverseList(ListNode head) {
+    ListNode prev = null;
+    ListNode curr = head;
+    while (curr != null) {
+        ListNode nxt = curr.next; // Save forward node address
+        curr.next = prev;         // Flip node reference backward
+        prev = curr;              // Step prev reference forward
+        curr = nxt;               // Step curr reference forward
     }
+    return prev;
 }`,
       timeComplexity: 'O(N) — Single linear pass over heap nodes',
       spaceComplexity: 'O(1) — Three stack-frame reference variables',
@@ -282,9 +278,7 @@ class LRUCache:
     pointerMechanicsNote:
       'The curr pointer dequeues a TreeNode address from the front of the Deque, appends curr.val to the current level list, and enqueues non-null curr.left and curr.right heap addresses.',
     python: {
-      code: `from collections import deque
-
-def levelOrder(root: TreeNode) -> list[list[int]]:
+      code: `def levelOrder(root: TreeNode) -> list[list[int]]:
     if not root:
         return []
     result = []
@@ -364,9 +358,7 @@ def levelOrder(root: TreeNode) -> list[list[int]]:
     pointerMechanicsNote:
       'We allocate an adjacency list on the heap and an indegree[V] integer table. As curr pops from the queue, we traverse each outgoing neighbor pointer nxt, decrementing indegree[nxt] and pushing nxt when it hits 0.',
     python: {
-      code: `from collections import deque
-
-def canFinish(numCourses: int, prerequisites: list[list[int]]) -> bool:
+      code: `def canFinish(numCourses: int, prerequisites: list[list[int]]) -> bool:
     adj = [[] for _ in range(numCourses)]
     indegree = [0] * numCourses
     for dest, src in prerequisites:
@@ -870,9 +862,7 @@ def canFinish(numCourses: int, prerequisites: list[list[int]]) -> bool:
     pointerMechanicsNote:
       'Binary heap is stored as a contiguous array where parent i has children at 2i+1 and 2i+2. Evicting heap[0] swaps the last leaf to index 0 and restores the heap invariant.',
     python: {
-      code: `import heapq
-
-def findKthLargest(nums: list[int], k: int) -> int:
+      code: `def findKthLargest(nums: list[int], k: int) -> int:
     min_heap = []
     for num in nums:
         heapq.heappush(min_heap, num)
@@ -980,9 +970,9 @@ def findKthLargest(nums: list[int], k: int) -> int:
       '-10^9 <= nums[i] <= 10^9',
       'Only one valid answer exists.'
     ],
-    defaultInput: 'nums=[2, 7, 11, 15] | target=9',
+    defaultInput: 'nums=[2, 11, 15, 7] | target=9',
     sampleInputs: [
-      { label: 'Early Match ([2,7,11,15], t=9)', value: 'nums=[2, 7, 11, 15] | target=9' },
+      { label: '4-Element Scan ([2,11,15,7], t=9)', value: 'nums=[2, 11, 15, 7] | target=9' },
       { label: 'Tail Pair ([3,2,4,8], t=12)', value: 'nums=[3, 2, 4, 8] | target=12' }
     ],
     companies: [
@@ -1093,4 +1083,7 @@ def findKthLargest(nums: list[int], k: int) -> int:
     }
   }
 ];
+
+export const PROBLEMS: AlgorithmProblem[] = buildFullTopicCurriculum(BASE_PROBLEMS);
+
 

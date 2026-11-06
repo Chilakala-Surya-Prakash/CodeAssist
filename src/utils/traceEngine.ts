@@ -10,48 +10,171 @@ function parseNumberList(raw: string, fallback: number[]): number[] {
   return matches.map(Number).slice(0, 12);
 }
 
+import { PROBLEMS } from '../data/problems';
+
 /**
  * Generates a full step-by-step execution trace with Stack Frames, Heap Allocations,
  * and Dynamic Pointer mutations for any problem and custom input string.
  */
 export function generateExecutionTrace(problemId: string, rawInput?: string): ExecutionStep[] {
-  switch (problemId) {
+  const matchedProblem = PROBLEMS.find((p) => p.id === problemId);
+  const effectiveFamilyId = matchedProblem?.traceFamilyId || problemId;
+  const effectiveInput = rawInput || matchedProblem?.defaultInput;
+
+  let rawSteps: ExecutionStep[];
+  switch (effectiveFamilyId) {
     case 'reverse-linked-list':
-      return traceReverseLinkedList(rawInput || '10 -> 20 -> 30 -> 40');
+      rawSteps = traceReverseLinkedList(effectiveInput || '10 -> 20 -> 30 -> 40');
+      break;
     case 'trapping-rain-water':
-      return traceTrappingRainWater(rawInput || '0, 2, 0, 3, 1, 0, 1, 3, 2, 1');
+      rawSteps = traceTrappingRainWater(effectiveInput || '0, 2, 0, 3, 1, 0, 1, 3, 2, 1');
+      break;
     case 'lru-cache-pointers':
-      return traceLRUCache(rawInput || 'cap=2 | PUT(1,10), PUT(2,20), GET(1), PUT(3,30)');
+      rawSteps = traceLRUCache(effectiveInput || 'cap=2 | PUT(1,10), PUT(2,20), GET(1), PUT(3,30)');
+      break;
     case 'binary-tree-level-order':
-      return traceBinaryTreeBFS(rawInput || '3, 9, 20, null, null, 15, 7');
+      rawSteps = traceBinaryTreeBFS(effectiveInput || '3, 9, 20, null, null, 15, 7');
+      break;
     case 'course-schedule-cycle':
-      return traceCourseScheduleDAG(rawInput || 'V=4 | 0->1, 0->2, 1->3, 2->3');
+      rawSteps = traceCourseScheduleDAG(effectiveInput || 'V=4 | 0->1, 0->2, 1->3, 2->3');
+      break;
     case 'cycle-detection-floyd':
-      return traceCycleDetectionFloyd(rawInput || '3 -> 2 -> 0 -> -4 (cycle=1)');
+      rawSteps = traceCycleDetectionFloyd(effectiveInput || '3 -> 2 -> 0 -> -4 (cycle=1)');
+      break;
     case 'longest-substring-unique':
-      return traceLongestSubstring(rawInput || 'abcabcbb');
+      rawSteps = traceLongestSubstring(effectiveInput || 'abcabcbb');
+      break;
     case 'search-rotated-sorted':
-      return traceRotatedBinarySearch(rawInput || 'nums=[4, 5, 6, 7, 0, 1, 2] | target=0');
+      rawSteps = traceRotatedBinarySearch(effectiveInput || 'nums=[4, 5, 6, 7, 0, 1, 2] | target=0');
+      break;
     case 'daily-temperatures-stack':
-      return traceDailyTemperatures(rawInput || '73, 74, 75, 71, 69, 72, 76, 73');
+      rawSteps = traceDailyTemperatures(effectiveInput || '73, 74, 75, 71, 69, 72, 76, 73');
+      break;
     case 'three-sum-zero':
-      return traceThreeSum(rawInput || '-4, -1, -1, 0, 1, 2');
+      rawSteps = traceThreeSum(effectiveInput || '-4, -1, -1, 0, 1, 2');
+      break;
     case 'coin-change-dp':
-      return traceCoinChangeDP(rawInput || 'coins=[1, 3, 4] | amount=6');
+      rawSteps = traceCoinChangeDP(effectiveInput || 'coins=[1, 3, 4] | amount=6');
+      break;
     case 'kth-largest-heap':
-      return traceKthLargestHeap(rawInput || 'nums=[3, 2, 1, 5, 6, 4] | k=2');
+      rawSteps = traceKthLargestHeap(effectiveInput || 'nums=[3, 2, 1, 5, 6, 4] | k=2');
+      break;
     case 'valid-parentheses-stack':
-      return traceValidParentheses(rawInput || '{[()]}');
+      rawSteps = traceValidParentheses(effectiveInput || '{[()]}');
+      break;
     case 'two-sum-hash':
-      return traceTwoSumHash(rawInput || 'nums=[2, 7, 11, 15] | target=9');
+      rawSteps = traceTwoSumHash(effectiveInput || 'nums=[2, 11, 15, 7] | target=9');
+      break;
     case 'container-most-water':
-      return traceContainerMostWater(rawInput || '1, 8, 6, 2, 5, 4, 8, 3, 7');
+      rawSteps = traceContainerMostWater(effectiveInput || '1, 8, 6, 2, 5, 4, 8, 3, 7');
+      break;
     default:
-      return traceReverseLinkedList('10 -> 20 -> 30 -> 40');
+      rawSteps = traceReverseLinkedList(effectiveInput || '10 -> 20 -> 30 -> 40');
+      break;
   }
+
+  return ensureGranularLineByLineTrace(matchedProblem?.python.code, rawSteps);
 }
 
-// 1. Reverse Singly Linked List
+/**
+ * Ensures that EVERY problem trace:
+ * 1. Always starts at Line 1 (Function Signature Entry) on Step 1 (stepIndex: 0).
+ * 2. Steps sequentially through initialization lines (Line 2, Line 3, ...) before entering the loop.
+ * 3. Steps through loop condition/header lines before executing loop body mutations.
+ */
+function ensureGranularLineByLineTrace(
+  pythonCode: string | undefined,
+  rawSteps: ExecutionStep[]
+): ExecutionStep[] {
+  if (rawSteps.length === 0) return rawSteps;
+  const codeLines = (pythonCode || '').split('\n');
+  const firstStep = rawSteps[0];
+  const expanded: ExecutionStep[] = [];
+
+  // Find loop header line in Python code (first `while ` or `for ` line)
+  let loopHeaderLine = -1;
+  for (let i = 0; i < codeLines.length; i++) {
+    const trimmed = codeLines[i].trim();
+    if (trimmed.startsWith('while ') || trimmed.startsWith('for ')) {
+      loopHeaderLine = i + 1;
+      break;
+    }
+  }
+
+  // 1. If firstStep does not start at Line 1, prepend Line 1..min(firstStep.pythonLine - 1, loopHeaderLine > 1 ? loopHeaderLine - 1 : 3)
+  if (firstStep.pythonLine > 1 && codeLines.length > 0) {
+    const initLimit =
+      loopHeaderLine > 1
+        ? Math.min(firstStep.pythonLine - 1, loopHeaderLine - 1)
+        : Math.min(firstStep.pythonLine - 1, 3);
+
+    for (let ln = 1; ln <= initLimit; ln++) {
+      const srcLine = (codeLines[ln - 1] || '').trim();
+      if (!srcLine || srcLine.startsWith('#')) continue;
+
+      const isFnEntry = ln === 1;
+      expanded.push({
+        ...firstStep,
+        stepIndex: expanded.length,
+        pythonLine: ln,
+        javaLine: Math.max(1, ln),
+        operationType: isFnEntry ? 'PUSH_STACK_FRAME' : 'INIT_POINTER',
+        title: isFnEntry
+          ? `Line 1: Enter Function \`${srcLine.replace(/:$/, '')}\` & Push Call Stack Frame`
+          : `Line ${ln}: Execute \`${srcLine}\` — Initialize Register / Heap State`,
+        intuition: isFnEntry
+          ? `Push stack frame ${firstStep.stackFrames[0]?.functionName || 'main()'} onto the call stack and bind the input heap reference parameters before executing Line 2.`
+          : `Execute initialization statement \`${srcLine}\` on Line ${ln} to prepare local stack registers before entering the main loop.`,
+        memoryMutation: isFnEntry
+          ? `Call stack frame allocated at ${firstStep.stackFrames[0]?.returnAddress || '0x7FFF0010'}.`
+          : `Initialized register state on Line ${ln}: ${srcLine}`,
+      });
+    }
+  }
+
+  // 2. Walk through rawSteps and insert loop header check only when entering the loop or wrapping around to a new iteration
+  rawSteps.forEach((step, idx) => {
+    const prevEmitted = expanded[expanded.length - 1];
+    const isEnteringLoop = !prevEmitted || prevEmitted.pythonLine < loopHeaderLine;
+    const isWrappingIteration =
+      prevEmitted &&
+      prevEmitted.pythonLine > loopHeaderLine &&
+      step.pythonLine <= prevEmitted.pythonLine;
+
+    if (
+      loopHeaderLine > 0 &&
+      step.pythonLine > loopHeaderLine &&
+      (isEnteringLoop || isWrappingIteration) &&
+      step.operationType !== 'RETURN_RESULT' &&
+      expanded.length < 40
+    ) {
+      const loopSrc = (codeLines[loopHeaderLine - 1] || '').trim();
+      expanded.push({
+        ...step,
+        stepIndex: expanded.length,
+        pythonLine: loopHeaderLine,
+        javaLine: Math.max(1, loopHeaderLine),
+        operationType: 'COMPARE_VALUES',
+        title: `Line ${loopHeaderLine}: Evaluate Loop Header \`${loopSrc}\``,
+        intuition: `Check loop continuation invariant \`${loopSrc}\` on Line ${loopHeaderLine} before executing the next loop body statement.`,
+        memoryMutation: `Loop condition holds True — stepping into loop body at Line ${step.pythonLine}.`,
+        stdout: idx > 0 ? rawSteps[idx - 1].stdout : undefined,
+      });
+    }
+
+    expanded.push({
+      ...step,
+      stepIndex: expanded.length,
+    });
+  });
+
+  return expanded.map((s, idx) => ({
+    ...s,
+    stepIndex: idx,
+  }));
+}
+
+// 1. Reverse Singly Linked List — Full Line-by-Line Execution (Lines 1..9)
 function traceReverseLinkedList(rawInput: string): ExecutionStep[] {
   const vals = parseNumberList(rawInput, [10, 20, 30, 40]).slice(0, 6);
   const n = vals.length;
@@ -89,37 +212,97 @@ function traceReverseLinkedList(rawInput: string): ExecutionStep[] {
     }))
   });
 
-  // Step 0: Initialize prev = None, curr = head
-  pointerOps += 2;
+  // Step 1 (Line 1): Function Entry def reverseList(head: ListNode) -> ListNode:
   steps.push({
-    stepIndex: 0,
-    title: 'Initialize Stack Pointers (prev = NULL, curr = head)',
-    pythonLine: 7,
-    javaLine: 4,
-    operationType: 'INIT_POINTER',
-    intuition: `Allocate stack pointer registers prev (initialized to 0x0000 NULL) and curr pointing to the first heap node at ${nodeAddrs[0]}.`,
-    memoryMutation: `Stack frame reverseList() binds prev = NULL and curr = ${nodeAddrs[0]}.`,
-    invariantCheck: 'Prefix [0..-1] is reversed (empty); suffix [0..n-1] retains original forward links.',
+    stepIndex: steps.length,
+    title: `Line 1: Enter reverseList(head = ${nodeAddrs[0]}) — Bind Head Parameter`,
+    pythonLine: 1,
+    javaLine: 1,
+    operationType: 'PUSH_STACK_FRAME',
+    intuition: `Push stack frame reverseList() onto the call stack. Parameter head points to the first heap node Node(${vals[0]}) at ${nodeAddrs[0]}.`,
+    memoryMutation: `Stack frame allocated @ 0x7FFF0010; head = ${nodeAddrs[0]}.`,
+    invariantCheck: `Input list has ${n} heap nodes: ${vals.join(' -> ')} -> NULL.`,
     stackFrames: [
       {
         id: 'frame-main',
         functionName: 'reverseList(head)',
-        line: 7,
+        line: 1,
+        returnAddress: '0x7FFF0010',
+        isActive: true,
+        variables: [
+          { name: 'head', value: nodeAddrs[0], type: 'ListNode*', address: '0x7FFF0100', isPointer: true, pointsToAddress: nodeAddrs[0], changed: true }
+        ]
+      }
+    ],
+    heapObjects: [snapshotHeap(0, null, -1)],
+    pointers: [
+      { id: 'ptr-head', name: 'head', targetObjectId: 'heap-ll', targetIndex: 0, targetAddress: nodeAddrs[0], role: 'primary', deltaDescription: `Entry parameter (${nodeAddrs[0]})` }
+    ],
+    metrics: { comparisons, pointerOps, heapBytesUsed: n * 24, timeStepO: 'Line 1' }
+  });
+
+  // Step 2 (Line 2): prev = None
+  pointerOps += 1;
+  steps.push({
+    stepIndex: steps.length,
+    title: 'Line 2: Execute `prev = None` — Initialize Reversed Prefix Anchor',
+    pythonLine: 2,
+    javaLine: 2,
+    operationType: 'INIT_POINTER',
+    intuition: 'Allocate stack pointer register prev and initialize it to NULL (0x0000), since the new tail (Node 0) must point to NULL after reversal.',
+    memoryMutation: 'Stack register prev = NULL (0x0000) @ 0x7FFF0108.',
+    invariantCheck: 'Reversed prefix is currently empty (prev == NULL).',
+    stackFrames: [
+      {
+        id: 'frame-main',
+        functionName: 'reverseList(head)',
+        line: 2,
         returnAddress: '0x7FFF0010',
         isActive: true,
         variables: [
           { name: 'head', value: nodeAddrs[0], type: 'ListNode*', address: '0x7FFF0100', isPointer: true, pointsToAddress: nodeAddrs[0] },
-          { name: 'prev', value: 'NULL (0x0000)', type: 'ListNode*', address: '0x7FFF0108', isPointer: true, changed: true },
+          { name: 'prev', value: 'NULL (0x0000)', type: 'ListNode*', address: '0x7FFF0108', isPointer: true, changed: true }
+        ]
+      }
+    ],
+    heapObjects: [snapshotHeap(0, null, -1)],
+    pointers: [
+      { id: 'ptr-prev', name: 'prev', targetObjectId: 'heap-ll', targetIndex: null, targetAddress: '0x0000', role: 'anchor', deltaDescription: 'prev = NULL' }
+    ],
+    metrics: { comparisons, pointerOps, heapBytesUsed: n * 24, timeStepO: 'Line 2' }
+  });
+
+  // Step 3 (Line 3): curr = head
+  pointerOps += 1;
+  steps.push({
+    stepIndex: steps.length,
+    title: `Line 3: Execute \`curr = head\` — Bind Traversal Cursor to ${nodeAddrs[0]}`,
+    pythonLine: 3,
+    javaLine: 3,
+    operationType: 'INIT_POINTER',
+    intuition: `Copy the head address (${nodeAddrs[0]}) into stack register curr so we can step through the list without losing the current node.`,
+    memoryMutation: `Stack register curr = ${nodeAddrs[0]} @ 0x7FFF0110.`,
+    invariantCheck: 'Prefix [0..-1] is reversed; suffix [0..n-1] starts at curr.',
+    stackFrames: [
+      {
+        id: 'frame-main',
+        functionName: 'reverseList(head)',
+        line: 3,
+        returnAddress: '0x7FFF0010',
+        isActive: true,
+        variables: [
+          { name: 'head', value: nodeAddrs[0], type: 'ListNode*', address: '0x7FFF0100', isPointer: true, pointsToAddress: nodeAddrs[0] },
+          { name: 'prev', value: 'NULL (0x0000)', type: 'ListNode*', address: '0x7FFF0108', isPointer: true },
           { name: 'curr', value: nodeAddrs[0], type: 'ListNode*', address: '0x7FFF0110', isPointer: true, pointsToAddress: nodeAddrs[0], changed: true }
         ]
       }
     ],
     heapObjects: [snapshotHeap(0, null, -1)],
     pointers: [
-      { id: 'ptr-prev', name: 'prev', targetObjectId: 'heap-ll', targetIndex: null, targetAddress: '0x0000', role: 'anchor', deltaDescription: 'Initialized to NULL' },
-      { id: 'ptr-curr', name: 'curr', targetObjectId: 'heap-ll', targetIndex: 0, targetAddress: nodeAddrs[0], role: 'primary', deltaDescription: `Points to head (${nodeAddrs[0]})` }
+      { id: 'ptr-prev', name: 'prev', targetObjectId: 'heap-ll', targetIndex: null, targetAddress: '0x0000', role: 'anchor', deltaDescription: 'NULL' },
+      { id: 'ptr-curr', name: 'curr', targetObjectId: 'heap-ll', targetIndex: 0, targetAddress: nodeAddrs[0], role: 'primary', deltaDescription: `curr = ${nodeAddrs[0]}` }
     ],
-    metrics: { comparisons, pointerOps, heapBytesUsed: n * 24, timeStepO: 'O(1)' }
+    metrics: { comparisons, pointerOps, heapBytesUsed: n * 24, timeStepO: 'Line 3' }
   });
 
   let prevIdx: number | null = null;
@@ -127,24 +310,55 @@ function traceReverseLinkedList(rawInput: string): ExecutionStep[] {
     const nxtIdx: number | null = i + 1 < n ? i + 1 : null;
     const nxtAddr = nxtIdx !== null ? nodeAddrs[nxtIdx] : '0x0000';
     const prevAddr = prevIdx !== null ? nodeAddrs[prevIdx] : '0x0000';
-    comparisons += 1;
-    pointerOps += 1;
 
-    // Step A: Cache nxt = curr.next
+    // Line 4: while curr is not None:
+    comparisons += 1;
     steps.push({
       stepIndex: steps.length,
-      title: `Node ${vals[i]}: Cache Forward Reference (nxt = curr.next)`,
-      pythonLine: 9,
-      javaLine: 6,
+      title: `Line 4: Check \`while curr is not None\` → True (curr = ${nodeAddrs[i]})`,
+      pythonLine: 4,
+      javaLine: 4,
+      operationType: 'COMPARE_VALUES',
+      intuition: `Evaluate loop condition: curr (${nodeAddrs[i]}, Node ${vals[i]}) is not NULL, so we enter the loop body for iteration ${i + 1} of ${n}.`,
+      memoryMutation: `Condition (curr != 0x0000) evaluated to True.`,
+      invariantCheck: `${n - i} unreversed node(s) remaining starting at ${nodeAddrs[i]}.`,
+      stackFrames: [
+        {
+          id: 'frame-main',
+          functionName: 'reverseList(head)',
+          line: 4,
+          returnAddress: '0x7FFF0010',
+          isActive: true,
+          variables: [
+            { name: 'prev', value: prevAddr, type: 'ListNode*', address: '0x7FFF0108', isPointer: true, pointsToAddress: prevAddr },
+            { name: 'curr', value: nodeAddrs[i], type: 'ListNode*', address: '0x7FFF0110', isPointer: true, pointsToAddress: nodeAddrs[i] }
+          ]
+        }
+      ],
+      heapObjects: [snapshotHeap(i, null, i - 1)],
+      pointers: [
+        { id: 'ptr-prev', name: 'prev', targetObjectId: 'heap-ll', targetIndex: prevIdx, targetAddress: prevAddr, role: 'anchor' },
+        { id: 'ptr-curr', name: 'curr', targetObjectId: 'heap-ll', targetIndex: i, targetAddress: nodeAddrs[i], role: 'primary' }
+      ],
+      metrics: { comparisons, pointerOps, heapBytesUsed: n * 24, timeStepO: `Iter ${i + 1}/${n}` }
+    });
+
+    // Line 5: nxt = curr.next
+    pointerOps += 1;
+    steps.push({
+      stepIndex: steps.length,
+      title: `Line 5: Execute \`nxt = curr.next\` — Cache Forward Address (${nxtAddr})`,
+      pythonLine: 5,
+      javaLine: 5,
       operationType: 'INIT_POINTER',
-      intuition: `Before mutating Node(${vals[i]}).next, save its forward address (${nxtAddr}) into register nxt so we don't orphan the rest of the list.`,
+      intuition: `Before overwriting Node(${vals[i]}).next, save its forward address (${nxtAddr}) into register nxt so we don't orphan the remainder of the heap list.`,
       memoryMutation: `nxt register updated to ${nxtAddr}.`,
       invariantCheck: `Forward chain starting at ${nxtAddr} is safely anchored by nxt.`,
       stackFrames: [
         {
           id: 'frame-main',
           functionName: 'reverseList(head)',
-          line: 9,
+          line: 5,
           returnAddress: '0x7FFF0010',
           isActive: true,
           variables: [
@@ -160,55 +374,123 @@ function traceReverseLinkedList(rawInput: string): ExecutionStep[] {
         { id: 'ptr-curr', name: 'curr', targetObjectId: 'heap-ll', targetIndex: i, targetAddress: nodeAddrs[i], role: 'primary' },
         { id: 'ptr-nxt', name: 'nxt', targetObjectId: 'heap-ll', targetIndex: nxtIdx, targetAddress: nxtAddr, role: 'fast', deltaDescription: `Saved curr.next (${nxtAddr})` }
       ],
-      metrics: { comparisons, pointerOps, heapBytesUsed: n * 24, timeStepO: `Step ${i + 1}/${n}` }
+      metrics: { comparisons, pointerOps, heapBytesUsed: n * 24, timeStepO: `Iter ${i + 1}/${n}` }
     });
 
-    // Step B: Flip curr.next = prev and advance pointers
+    // Line 6: curr.next = prev
     nextLinks[i] = prevIdx !== null ? nodeAddrs[prevIdx] : null;
-    pointerOps += 3;
+    pointerOps += 1;
     steps.push({
       stepIndex: steps.length,
-      title: `Node ${vals[i]}: Flip .next Backward & Advance Pointers`,
-      pythonLine: 10,
-      javaLine: 7,
+      title: `Line 6: Execute \`curr.next = prev\` — Flip Node(${vals[i]}).next Backward to ${prevAddr}`,
+      pythonLine: 6,
+      javaLine: 6,
       operationType: 'REWIRE_NEXT_PTR',
-      intuition: `Mutate Node(${vals[i]}).next in heap memory to point backward to ${prevAddr}, then step prev to ${nodeAddrs[i]} and curr to ${nxtAddr}.`,
-      memoryMutation: `Heap write at ${nodeAddrs[i]}+0x08: .next changed to ${prevAddr}.`,
-      invariantCheck: `Nodes [0..${i}] are now fully reversed in-place.`,
+      intuition: `Mutate Node(${vals[i]}).next directly in heap memory (${nodeAddrs[i]}+0x08) to point backward to prev (${prevAddr}).`,
+      memoryMutation: `Heap write at ${nodeAddrs[i]}.next = ${prevAddr}.`,
+      invariantCheck: `Node(${vals[i]}) now points backward to ${prevAddr}.`,
       stackFrames: [
         {
           id: 'frame-main',
           functionName: 'reverseList(head)',
-          line: 12,
+          line: 6,
+          returnAddress: '0x7FFF0010',
+          isActive: true,
+          variables: [
+            { name: 'prev', value: prevAddr, type: 'ListNode*', address: '0x7FFF0108', isPointer: true, pointsToAddress: prevAddr },
+            { name: 'curr', value: nodeAddrs[i], type: 'ListNode*', address: '0x7FFF0110', isPointer: true, pointsToAddress: nodeAddrs[i] },
+            { name: 'nxt', value: nxtAddr, type: 'ListNode*', address: '0x7FFF0118', isPointer: true, pointsToAddress: nxtAddr }
+          ]
+        }
+      ],
+      heapObjects: [snapshotHeap(i, i, i)],
+      pointers: [
+        { id: 'ptr-prev', name: 'prev', targetObjectId: 'heap-ll', targetIndex: prevIdx, targetAddress: prevAddr, role: 'anchor' },
+        { id: 'ptr-curr', name: 'curr', targetObjectId: 'heap-ll', targetIndex: i, targetAddress: nodeAddrs[i], role: 'primary', deltaDescription: `.next flipped → ${prevAddr}` },
+        { id: 'ptr-nxt', name: 'nxt', targetObjectId: 'heap-ll', targetIndex: nxtIdx, targetAddress: nxtAddr, role: 'fast' }
+      ],
+      metrics: { comparisons, pointerOps, heapBytesUsed: n * 24, timeStepO: `Iter ${i + 1}/${n}` }
+    });
+
+    // Line 7: prev = curr
+    pointerOps += 1;
+    steps.push({
+      stepIndex: steps.length,
+      title: `Line 7: Execute \`prev = curr\` — Advance prev Register to ${nodeAddrs[i]}`,
+      pythonLine: 7,
+      javaLine: 7,
+      operationType: 'MOVE_POINTER',
+      intuition: `Step the reversed-prefix anchor prev forward to the newly reversed node at ${nodeAddrs[i]} (Node ${vals[i]}).`,
+      memoryMutation: `prev = ${nodeAddrs[i]}.`,
+      invariantCheck: `prev now points to the head of reversed prefix [0..${i}].`,
+      stackFrames: [
+        {
+          id: 'frame-main',
+          functionName: 'reverseList(head)',
+          line: 7,
           returnAddress: '0x7FFF0010',
           isActive: true,
           variables: [
             { name: 'prev', value: nodeAddrs[i], type: 'ListNode*', address: '0x7FFF0108', isPointer: true, pointsToAddress: nodeAddrs[i], changed: true },
+            { name: 'curr', value: nodeAddrs[i], type: 'ListNode*', address: '0x7FFF0110', isPointer: true, pointsToAddress: nodeAddrs[i] },
+            { name: 'nxt', value: nxtAddr, type: 'ListNode*', address: '0x7FFF0118', isPointer: true, pointsToAddress: nxtAddr }
+          ]
+        }
+      ],
+      heapObjects: [snapshotHeap(i, null, i)],
+      pointers: [
+        { id: 'ptr-prev', name: 'prev', targetObjectId: 'heap-ll', targetIndex: i, targetAddress: nodeAddrs[i], role: 'anchor', deltaDescription: `prev = ${nodeAddrs[i]}` },
+        { id: 'ptr-curr', name: 'curr', targetObjectId: 'heap-ll', targetIndex: i, targetAddress: nodeAddrs[i], role: 'primary' },
+        { id: 'ptr-nxt', name: 'nxt', targetObjectId: 'heap-ll', targetIndex: nxtIdx, targetAddress: nxtAddr, role: 'fast' }
+      ],
+      metrics: { comparisons, pointerOps, heapBytesUsed: n * 24, timeStepO: `Iter ${i + 1}/${n}` }
+    });
+
+    // Line 8: curr = nxt
+    pointerOps += 1;
+    steps.push({
+      stepIndex: steps.length,
+      title: `Line 8: Execute \`curr = nxt\` — Advance curr Register to ${nxtAddr}`,
+      pythonLine: 8,
+      javaLine: 8,
+      operationType: 'MOVE_POINTER',
+      intuition: `Advance curr to the cached forward address nxt (${nxtAddr}) so the next loop iteration processes the next node.`,
+      memoryMutation: `curr = ${nxtAddr}.`,
+      invariantCheck: `Prefix [0..${i}] is reversed; suffix starts at curr (${nxtAddr}).`,
+      stackFrames: [
+        {
+          id: 'frame-main',
+          functionName: 'reverseList(head)',
+          line: 8,
+          returnAddress: '0x7FFF0010',
+          isActive: true,
+          variables: [
+            { name: 'prev', value: nodeAddrs[i], type: 'ListNode*', address: '0x7FFF0108', isPointer: true, pointsToAddress: nodeAddrs[i] },
             { name: 'curr', value: nxtAddr, type: 'ListNode*', address: '0x7FFF0110', isPointer: true, pointsToAddress: nxtAddr, changed: true },
             { name: 'nxt', value: nxtAddr, type: 'ListNode*', address: '0x7FFF0118', isPointer: true, pointsToAddress: nxtAddr }
           ]
         }
       ],
-      heapObjects: [snapshotHeap(nxtIdx, i, i)],
+      heapObjects: [snapshotHeap(nxtIdx, null, i)],
       pointers: [
-        { id: 'ptr-prev', name: 'prev', targetObjectId: 'heap-ll', targetIndex: i, targetAddress: nodeAddrs[i], role: 'anchor', deltaDescription: `Advanced to ${nodeAddrs[i]}` },
-        { id: 'ptr-curr', name: 'curr', targetObjectId: 'heap-ll', targetIndex: nxtIdx, targetAddress: nxtAddr, role: 'primary', deltaDescription: `Advanced to ${nxtAddr}` },
+        { id: 'ptr-prev', name: 'prev', targetObjectId: 'heap-ll', targetIndex: i, targetAddress: nodeAddrs[i], role: 'anchor' },
+        { id: 'ptr-curr', name: 'curr', targetObjectId: 'heap-ll', targetIndex: nxtIdx, targetAddress: nxtAddr, role: 'primary', deltaDescription: `curr = ${nxtAddr}` },
         { id: 'ptr-nxt', name: 'nxt', targetObjectId: 'heap-ll', targetIndex: nxtIdx, targetAddress: nxtAddr, role: 'fast' }
       ],
-      metrics: { comparisons, pointerOps, heapBytesUsed: n * 24, timeStepO: `Step ${i + 1}/${n}` }
+      metrics: { comparisons, pointerOps, heapBytesUsed: n * 24, timeStepO: `Iter ${i + 1}/${n}` }
     });
 
     prevIdx = i;
   }
 
-  // Final Step: Return prev as new head
+  // Final Step (Line 9): Return prev as new head
   steps.push({
     stepIndex: steps.length,
-    title: `Return New Head (prev = ${nodeAddrs[n - 1]})`,
-    pythonLine: 13,
-    javaLine: 11,
+    title: `Line 9: Execute \`return prev\` — Return New Head (${nodeAddrs[n - 1]})`,
+    pythonLine: 9,
+    javaLine: 10,
     operationType: 'RETURN_RESULT',
-    intuition: `curr has reached NULL (0x0000). Pointer prev sits at ${nodeAddrs[n - 1]} (value ${vals[n - 1]}), which is now the head of the completely reversed linked list.`,
+    intuition: `curr has reached NULL (0x0000). Pointer prev sits at ${nodeAddrs[n - 1]} (value ${vals[n - 1]}), which is returned as the head of the completely reversed linked list.`,
     memoryMutation: `Function returns heap address ${nodeAddrs[n - 1]}; stack frame popped.`,
     invariantCheck: `Reversed order: ${[...vals].reverse().join(' -> ')} -> NULL.`,
     stdout: `New Head: Node(${vals[n - 1]}) @ ${nodeAddrs[n - 1]} | Chain: ${[...vals].reverse().join(' -> ')}`,
@@ -216,7 +498,7 @@ function traceReverseLinkedList(rawInput: string): ExecutionStep[] {
       {
         id: 'frame-main',
         functionName: 'reverseList(head)',
-        line: 13,
+        line: 9,
         returnAddress: '0x7FFF0010',
         isActive: true,
         variables: [
@@ -1194,10 +1476,10 @@ function traceLongestSubstring(rawInput: string): ExecutionStep[] {
   return steps;
 }
 
-// 8. Search in Rotated Sorted Array
+// 8. Search in Rotated Sorted Array — Full Line-by-Line Execution
 function traceRotatedBinarySearch(rawInput: string): ExecutionStep[] {
-  const targetMatch = rawInput.match(/target\s*=\s*(-?\d+)/i);
-  const cleaned = rawInput.replace(/target\s*=\s*-?\d+/i, '');
+  const targetMatch = rawInput.match(/target\s*=\s*(-?\d+)/i) || rawInput.match(/\|\s*(-?\d+)/);
+  const cleaned = rawInput.replace(/target\s*=\s*-?\d+/i, '').replace(/\|\s*-?\d+/, '');
   const nums = parseNumberList(cleaned, [4, 5, 6, 7, 0, 1, 2]);
   const target = targetMatch ? Number(targetMatch[1]) : 0;
 
@@ -1205,18 +1487,73 @@ function traceRotatedBinarySearch(rawInput: string): ExecutionStep[] {
   let high = nums.length - 1;
   const steps: ExecutionStep[] = [];
   let iter = 0;
+  let foundTarget = false;
 
   while (low <= high && iter < 10) {
     iter++;
     const mid = Math.floor((low + high) / 2);
     const found = nums[mid] === target;
+    if (found) foundTarget = true;
     const leftSorted = nums[low] <= nums[mid];
 
+    // Step A (Line 4): Compute mid = (low + high) // 2
+    steps.push({
+      stepIndex: steps.length,
+      title: `Line 4: Execute \`mid = (${low} + ${high}) // 2\` → mid = [${mid}] (nums[${mid}] = ${nums[mid]})`,
+      pythonLine: 4,
+      javaLine: 5,
+      operationType: 'INIT_POINTER',
+      intuition: `Bisect active search window [${low}..${high}] at midpoint index mid = ${mid} (value ${nums[mid]}).`,
+      memoryMutation: `mid = ${mid} (points to ${hexAddr(0x8000, mid * 4)}).`,
+      invariantCheck: `Active search window [${low}..${high}] has ${high - low + 1} candidate element(s).`,
+      stackFrames: [
+        {
+          id: 'frame-bs',
+          functionName: `search(nums, target=${target})`,
+          line: 4,
+          returnAddress: '0x7FFF0080',
+          isActive: true,
+          variables: [
+            { name: 'low', value: String(low), type: 'int', address: '0x7FFF0800', isPointer: true, pointsToAddress: hexAddr(0x8000, low * 4) },
+            { name: 'mid', value: String(mid), type: 'int', address: '0x7FFF0804', isPointer: true, pointsToAddress: hexAddr(0x8000, mid * 4), changed: true },
+            { name: 'high', value: String(high), type: 'int', address: '0x7FFF0808', isPointer: true, pointsToAddress: hexAddr(0x8000, high * 4) },
+            { name: 'target', value: String(target), type: 'int', address: '0x7FFF080C', isPointer: false }
+          ]
+        }
+      ],
+      heapObjects: [
+        {
+          id: 'heap-bs',
+          address: '0x8000',
+          type: 'Array',
+          label: `int[] nums (Rotated Sorted Array, target=${target})`,
+          byteSize: nums.length * 4,
+          refCount: 1,
+          gcStatus: 'allocated',
+          cells: nums.map((v, idx) => ({
+            index: idx,
+            label: `[${idx}]`,
+            value: v,
+            addressOffset: hexAddr(0x8000, idx * 4),
+            status: idx === mid ? 'target' : idx >= low && idx <= high ? 'active' : 'discarded',
+            annotation: idx < low || idx > high ? 'Pruned' : idx === mid ? 'MID' : 'Active'
+          }))
+        }
+      ],
+      pointers: [
+        { id: 'p-low', name: 'low', targetObjectId: 'heap-bs', targetIndex: low, targetAddress: hexAddr(0x8000, low * 4), role: 'primary' },
+        { id: 'p-mid', name: 'mid', targetObjectId: 'heap-bs', targetIndex: mid, targetAddress: hexAddr(0x8000, mid * 4), role: 'fast', deltaDescription: `mid=[${mid}]` },
+        { id: 'p-high', name: 'high', targetObjectId: 'heap-bs', targetIndex: high, targetAddress: hexAddr(0x8000, high * 4), role: 'secondary' }
+      ],
+      metrics: { comparisons: iter, pointerOps: iter * 2 - 1, heapBytesUsed: nums.length * 4, timeStepO: `Probe ${iter}` }
+    });
+
+    // Step B (Line 6 or 7/12): Compare nums[mid] with target and narrow bounds
     steps.push({
       stepIndex: steps.length,
       title: found
-        ? `Target Found at mid=[${mid}] (nums[${mid}] == ${target})`
-        : `Bisect [${low}..${high}] at mid=[${mid}] (val=${nums[mid]}) — ${leftSorted ? 'Left Half Sorted' : 'Right Half Sorted'}`,
+        ? `Line 6: Target Found! \`nums[${mid}] == ${target}\` → Return Index ${mid}`
+        : `Line ${leftSorted ? 7 : 12}: ${leftSorted ? 'Left Half Sorted' : 'Right Half Sorted'} — Prune Search Space`,
       pythonLine: found ? 6 : leftSorted ? 7 : 12,
       javaLine: found ? 6 : leftSorted ? 7 : 13,
       operationType: found ? 'RETURN_RESULT' : 'COMPARE_VALUES',
@@ -1278,6 +1615,19 @@ function traceRotatedBinarySearch(rawInput: string): ExecutionStep[] {
       if (nums[mid] < target && target <= nums[high]) low = mid + 1;
       else high = mid - 1;
     }
+  }
+
+  if (!foundTarget && steps.length > 0) {
+    steps.push({
+      ...steps[steps.length - 1],
+      stepIndex: steps.length,
+      pythonLine: 17,
+      javaLine: 20,
+      title: `Line 17: Search Space Exhausted (low=${low} > high=${high}) — Execute \`return -1\``,
+      operationType: 'RETURN_RESULT',
+      intuition: `Target ${target} does not exist in the rotated array. Return -1.`,
+      stdout: `Target ${target} not found => -1`,
+    });
   }
 
   return steps;
@@ -1705,91 +2055,268 @@ function traceValidParentheses(rawInput: string): ExecutionStep[] {
   return steps;
 }
 
-// 14. Two Sum (Hash Table)
+// 14. Two Sum (Hash Table) — Full Line-by-Line Execution (Lines 1..8)
 function traceTwoSumHash(rawInput: string): ExecutionStep[] {
-  const targetMatch = rawInput.match(/target\s*=\s*(-?\d+)/i);
-  const cleaned = rawInput.replace(/target\s*=\s*-?\d+/i, '');
-  const nums = parseNumberList(cleaned, [2, 7, 11, 15]);
+  const targetMatch = rawInput.match(/target\s*=\s*(-?\d+)/i) || rawInput.match(/\|\s*(-?\d+)/);
+  const cleaned = rawInput.replace(/target\s*=\s*-?\d+/i, '').replace(/\|\s*-?\d+/, '');
+  const nums = parseNumberList(cleaned, [2, 11, 15, 7]);
   const target = targetMatch ? Number(targetMatch[1]) : 9;
 
   const seen = new Map<number, number>();
   const steps: ExecutionStep[] = [];
 
+  const buildHeapState = (activeIdx: number | null, partnerIdx: number | null, hitComp: number | null): HeapObject[] => [
+    {
+      id: 'heap-2sum-arr',
+      address: '0x9C00',
+      type: 'Array',
+      label: `int[] nums (target=${target})`,
+      byteSize: nums.length * 4,
+      refCount: 1,
+      gcStatus: 'allocated',
+      cells: nums.map((v, idx) => ({
+        index: idx,
+        label: `[${idx}]`,
+        value: v,
+        addressOffset: hexAddr(0x9C00, idx * 4),
+        status:
+          idx === activeIdx
+            ? 'active'
+            : partnerIdx !== null && idx === partnerIdx
+            ? 'target'
+            : activeIdx !== null && idx < activeIdx
+            ? 'visited'
+            : 'idle',
+        annotation: partnerIdx !== null && idx === partnerIdx ? 'Partner!' : ''
+      }))
+    },
+    {
+      id: 'heap-2sum-map',
+      address: '0x9D00',
+      type: 'HashMap',
+      label: `HashMap seen (value → index, ${seen.size} entries)`,
+      byteSize: Math.max(1, seen.size) * 16,
+      refCount: 1,
+      gcStatus: 'mutated',
+      cells:
+        seen.size > 0
+          ? Array.from(seen.entries()).map(([k, v]) => ({
+              index: k,
+              label: `key=${k}`,
+              value: `idx ${v}`,
+              addressOffset: hexAddr(0x9D00, v * 16),
+              status: hitComp !== null && k === hitComp ? 'target' : 'visited'
+            }))
+          : [{ index: 'empty', label: 'seen{}', value: '∅ (empty)', addressOffset: '0x9D00', status: 'idle', annotation: '0 buckets' }]
+    }
+  ];
+
+  // Step 1 (Line 1): Function Entry
+  steps.push({
+    stepIndex: steps.length,
+    title: `Line 1: Enter twoSum(nums, target=${target}) — Push Stack Frame`,
+    pythonLine: 1,
+    javaLine: 2,
+    operationType: 'PUSH_STACK_FRAME',
+    intuition: `Push stack frame twoSum() onto the call stack and bind the contiguous input array nums (${nums.length} ints @ 0x9C00) and target = ${target}.`,
+    memoryMutation: `Stack frame allocated @ 0x7FFF00E0; target = ${target}.`,
+    invariantCheck: `Input array has ${nums.length} elements.`,
+    stackFrames: [
+      {
+        id: 'frame-2sum',
+        functionName: `twoSum(nums, target=${target})`,
+        line: 1,
+        returnAddress: '0x7FFF00E0',
+        isActive: true,
+        variables: [
+          { name: 'nums', value: '0x9C00', type: 'int[]', address: '0x7FFF0DF8', isPointer: true, pointsToAddress: '0x9C00', changed: true },
+          { name: 'target', value: String(target), type: 'int', address: '0x7FFF0DFC', isPointer: false, changed: true }
+        ]
+      }
+    ],
+    heapObjects: buildHeapState(null, null, null),
+    pointers: [],
+    metrics: { comparisons: 0, pointerOps: 1, heapBytesUsed: nums.length * 4, timeStepO: 'Line 1' }
+  });
+
+  // Step 2 (Line 2): seen = {}
+  steps.push({
+    stepIndex: steps.length,
+    title: 'Line 2: Execute `seen = {}` — Allocate Empty HashMap on Heap (@ 0x9D00)',
+    pythonLine: 2,
+    javaLine: 3,
+    operationType: 'ALLOCATE_HEAP',
+    intuition: 'Allocate an empty hash table seen{} on the heap to map each visited number to its array index in O(1) time.',
+    memoryMutation: 'Allocated HashMap seen{} @ 0x9D00 (0 entries).',
+    invariantCheck: 'seen{} is empty prior to index 0.',
+    stackFrames: [
+      {
+        id: 'frame-2sum',
+        functionName: `twoSum(nums, target=${target})`,
+        line: 2,
+        returnAddress: '0x7FFF00E0',
+        isActive: true,
+        variables: [
+          { name: 'seen', value: '0x9D00 ({})', type: 'dict[int,int]', address: '0x7FFF0DF0', isPointer: true, pointsToAddress: '0x9D00', changed: true },
+          { name: 'target', value: String(target), type: 'int', address: '0x7FFF0DFC', isPointer: false }
+        ]
+      }
+    ],
+    heapObjects: buildHeapState(null, null, null),
+    pointers: [],
+    metrics: { comparisons: 0, pointerOps: 2, heapBytesUsed: nums.length * 4 + 16, timeStepO: 'Line 2' }
+  });
+
+  let foundMatch = false;
   for (let i = 0; i < nums.length; i++) {
     const comp = target - nums[i];
     const hit = seen.has(comp);
-    if (!hit) seen.set(nums[i], i);
+    const partnerIdx = hit ? seen.get(comp)! : null;
 
+    // Line 3: for i, num in enumerate(nums):
     steps.push({
       stepIndex: steps.length,
-      title: hit
-        ? `Complement ${comp} Found in HashMap at Index ${seen.get(comp)}! Return [${seen.get(comp)}, ${i}]`
-        : `Scan i=[${i}] (val=${nums[i]}): Need comp=${comp} (Miss) → Insert seen[${nums[i]}]=${i}`,
-      pythonLine: hit ? 6 : 7,
-      javaLine: hit ? 7 : 9,
-      operationType: hit ? 'RETURN_RESULT' : 'MUTATE_MEMORY',
-      intuition: hit
-        ? `target (${target}) - nums[${i}] (${nums[i]}) = ${comp}, which is cached in seen{} at index ${seen.get(comp)}!`
-        : `Complement ${comp} is not in seen{} yet. Cache value ${nums[i]} → index ${i} in O(1) time.`,
-      memoryMutation: hit ? `Return [${seen.get(comp)}, ${i}]` : `seen[${nums[i]}] = ${i}`,
-      invariantCheck: `HashMap holds ${seen.size} value→index entries.`,
-      stdout: hit ? `Result Indices: [${seen.get(comp)}, ${i}]` : undefined,
+      title: `Line 3: Loop \`for i, num in enumerate(nums)\` → i = ${i}, num = ${nums[i]}`,
+      pythonLine: 3,
+      javaLine: 4,
+      operationType: 'MOVE_POINTER',
+      intuition: `Advance loop index pointer i to [${i}] and load nums[${i}] = ${nums[i]} into register num.`,
+      memoryMutation: `i = ${i}, num = ${nums[i]}.`,
+      invariantCheck: `Checked indices [0..${i - 1}]; inspecting index ${i}.`,
       stackFrames: [
         {
           id: 'frame-2sum',
           functionName: `twoSum(nums, target=${target})`,
-          line: hit ? 6 : 7,
+          line: 3,
           returnAddress: '0x7FFF00E0',
           isActive: true,
           variables: [
             { name: 'i', value: String(i), type: 'int', address: '0x7FFF0E00', isPointer: true, pointsToAddress: hexAddr(0x9C00, i * 4), changed: true },
+            { name: 'num', value: String(nums[i]), type: 'int', address: '0x7FFF0E04', isPointer: false, changed: true }
+          ]
+        }
+      ],
+      heapObjects: buildHeapState(i, null, null),
+      pointers: [
+        { id: 'p-i', name: 'i', targetObjectId: 'heap-2sum-arr', targetIndex: i, targetAddress: hexAddr(0x9C00, i * 4), role: 'primary', deltaDescription: `nums[${i}]=${nums[i]}` }
+      ],
+      metrics: { comparisons: i + 1, pointerOps: i + 2, heapBytesUsed: nums.length * 4 + seen.size * 16, timeStepO: `Iter i=${i}` }
+    });
+
+    // Line 4: comp = target - num & Line 5: if comp in seen:
+    steps.push({
+      stepIndex: steps.length,
+      title: `Lines 4–5: Compute \`comp = ${target} - ${nums[i]} = ${comp}\` & Probe \`if ${comp} in seen\` (${hit ? 'HIT!' : 'Miss'})`,
+      pythonLine: 5,
+      javaLine: 6,
+      operationType: 'COMPARE_VALUES',
+      intuition: hit
+        ? `Required complement is ${comp}. Probing HashMap seen{} finds key ${comp} at index ${partnerIdx}!`
+        : `Required complement is ${comp}. Probing HashMap seen{} returns Miss (${comp} not seen yet).`,
+      memoryMutation: `comp = ${comp}; seen.contains(${comp}) => ${hit}.`,
+      invariantCheck: `HashMap holds ${seen.size} entry(s).`,
+      stackFrames: [
+        {
+          id: 'frame-2sum',
+          functionName: `twoSum(nums, target=${target})`,
+          line: 5,
+          returnAddress: '0x7FFF00E0',
+          isActive: true,
+          variables: [
+            { name: 'i', value: String(i), type: 'int', address: '0x7FFF0E00', isPointer: true, pointsToAddress: hexAddr(0x9C00, i * 4) },
             { name: 'num', value: String(nums[i]), type: 'int', address: '0x7FFF0E04', isPointer: false },
             { name: 'comp', value: String(comp), type: 'int', address: '0x7FFF0E08', isPointer: false, changed: true }
           ]
         }
       ],
-      heapObjects: [
-        {
-          id: 'heap-2sum-arr',
-          address: '0x9C00',
-          type: 'Array',
-          label: `int[] nums (target=${target})`,
-          byteSize: nums.length * 4,
-          refCount: 1,
-          gcStatus: 'allocated',
-          cells: nums.map((v, idx) => ({
-            index: idx,
-            label: `[${idx}]`,
-            value: v,
-            addressOffset: hexAddr(0x9C00, idx * 4),
-            status: idx === i ? 'active' : hit && idx === seen.get(comp) ? 'target' : idx < i ? 'visited' : 'idle',
-            annotation: hit && idx === seen.get(comp) ? 'Partner!' : ''
-          }))
-        },
-        {
-          id: 'heap-2sum-map',
-          address: '0x9D00',
-          type: 'HashMap',
-          label: `HashMap seen (value → index)`,
-          byteSize: seen.size * 16,
-          refCount: 1,
-          gcStatus: 'mutated',
-          cells: Array.from(seen.entries()).map(([k, v]) => ({
-            index: k,
-            label: `key=${k}`,
-            value: `idx ${v}`,
-            addressOffset: hexAddr(0x9D00, v * 16),
-            status: hit && k === comp ? 'target' : 'visited'
-          }))
-        }
-      ],
+      heapObjects: buildHeapState(i, partnerIdx, hit ? comp : null),
       pointers: [
         { id: 'p-i', name: 'i', targetObjectId: 'heap-2sum-arr', targetIndex: i, targetAddress: hexAddr(0x9C00, i * 4), role: 'primary' }
       ],
-      metrics: { comparisons: i + 1, pointerOps: i + 1, heapBytesUsed: nums.length * 4 + seen.size * 16, timeStepO: 'O(1) Lookup' }
+      metrics: { comparisons: i + 1, pointerOps: i + 2, heapBytesUsed: nums.length * 4 + seen.size * 16, timeStepO: 'O(1) Probe' }
     });
 
-    if (hit) break;
+    if (hit) {
+      foundMatch = true;
+      // Line 6: return [seen[comp], i]
+      steps.push({
+        stepIndex: steps.length,
+        title: `Line 6: Execute \`return [seen[${comp}], ${i}]\` → Return [${partnerIdx}, ${i}]`,
+        pythonLine: 6,
+        javaLine: 7,
+        operationType: 'RETURN_RESULT',
+        intuition: `nums[${partnerIdx}] (${comp}) + nums[${i}] (${nums[i]}) == ${target}! Return the matching index pair [${partnerIdx}, ${i}].`,
+        memoryMutation: `Return [${partnerIdx}, ${i}]`,
+        invariantCheck: `nums[${partnerIdx}] + nums[${i}] == ${target}.`,
+        stdout: `Result Indices: [${partnerIdx}, ${i}]`,
+        stackFrames: [
+          {
+            id: 'frame-2sum',
+            functionName: `twoSum(nums, target=${target})`,
+            line: 6,
+            returnAddress: '0x7FFF00E0',
+            isActive: true,
+            variables: [
+              { name: 'return', value: `[${partnerIdx}, ${i}]`, type: 'list[int]', address: '0x7FFF0E10', isPointer: false, changed: true },
+              { name: 'i', value: String(i), type: 'int', address: '0x7FFF0E00', isPointer: true, pointsToAddress: hexAddr(0x9C00, i * 4) },
+              { name: 'comp', value: String(comp), type: 'int', address: '0x7FFF0E08', isPointer: false }
+            ]
+          }
+        ],
+        heapObjects: buildHeapState(i, partnerIdx, comp),
+        pointers: [
+          { id: 'p-i', name: 'i', targetObjectId: 'heap-2sum-arr', targetIndex: i, targetAddress: hexAddr(0x9C00, i * 4), role: 'primary' }
+        ],
+        metrics: { comparisons: i + 1, pointerOps: i + 3, heapBytesUsed: nums.length * 4 + seen.size * 16, timeStepO: 'O(N) Complete' }
+      });
+      break;
+    } else {
+      seen.set(nums[i], i);
+      // Line 7: seen[num] = i
+      steps.push({
+        stepIndex: steps.length,
+        title: `Line 7: Execute \`seen[${nums[i]}] = ${i}\` — Cache Value → Index in HashMap`,
+        pythonLine: 7,
+        javaLine: 9,
+        operationType: 'MUTATE_MEMORY',
+        intuition: `Insert key ${nums[i]} → index ${i} into HashMap seen{} so any future element needing ${nums[i]} as its complement can find it in O(1).`,
+        memoryMutation: `seen[${nums[i]}] = ${i}`,
+        invariantCheck: `HashMap now stores ${seen.size} value→index entries.`,
+        stackFrames: [
+          {
+            id: 'frame-2sum',
+            functionName: `twoSum(nums, target=${target})`,
+            line: 7,
+            returnAddress: '0x7FFF00E0',
+            isActive: true,
+            variables: [
+              { name: 'i', value: String(i), type: 'int', address: '0x7FFF0E00', isPointer: true, pointsToAddress: hexAddr(0x9C00, i * 4) },
+              { name: 'num', value: String(nums[i]), type: 'int', address: '0x7FFF0E04', isPointer: false },
+              { name: 'comp', value: String(comp), type: 'int', address: '0x7FFF0E08', isPointer: false }
+            ]
+          }
+        ],
+        heapObjects: buildHeapState(i, null, null),
+        pointers: [
+          { id: 'p-i', name: 'i', targetObjectId: 'heap-2sum-arr', targetIndex: i, targetAddress: hexAddr(0x9C00, i * 4), role: 'primary' }
+        ],
+        metrics: { comparisons: i + 1, pointerOps: i + 3, heapBytesUsed: nums.length * 4 + seen.size * 16, timeStepO: 'O(1) Insert' }
+      });
+    }
+  }
+
+  if (!foundMatch) {
+    steps.push({
+      ...steps[steps.length - 1],
+      stepIndex: steps.length,
+      title: `Line 8: Execute \`return []\` — No Complement Pair Found`,
+      pythonLine: 8,
+      javaLine: 11,
+      operationType: 'RETURN_RESULT',
+      intuition: `Loop finished scanning all ${nums.length} elements without finding a pair summing to ${target}. Return [].`,
+      memoryMutation: 'Return []',
+      stdout: 'Result Indices: []'
+    });
   }
 
   return steps;
