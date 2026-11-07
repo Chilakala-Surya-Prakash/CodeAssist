@@ -51,16 +51,16 @@ test('1. Company dataset contains at least 50 top tech firms with valid question
   }
 });
 
-test('2. Topic Curriculum has 8 Core Topics with 20 authentic questions each (160 total) across all 6 languages', () => {
+test('2. Topic Curriculum has 8 Core Topics with 25 authentic questions each (200 total) across all 6 languages', () => {
   assert.equal(CORE_TOPICS.length, 8, 'Expected 8 Core Topics');
-  assert.equal(PROBLEMS.length, 160, `Expected 160 total problems (8 topics x 20), found ${PROBLEMS.length}`);
+  assert.equal(PROBLEMS.length, 200, `Expected 200 total problems (8 topics x 25), found ${PROBLEMS.length}`);
 
   for (const topicMeta of CORE_TOPICS) {
     const topicProblems = PROBLEMS.filter((p) => p.topic === topicMeta.id);
     assert.equal(
       topicProblems.length,
-      20,
-      `Expected 20 questions for topic ${topicMeta.id}, found ${topicProblems.length}`
+      25,
+      `Expected 25 questions for topic ${topicMeta.id}, found ${topicProblems.length}`
     );
     topicProblems.forEach((p, idx) => {
       assert.equal(p.topicIndex, idx + 1);
@@ -97,7 +97,7 @@ test('2. Topic Curriculum has 8 Core Topics with 20 authentic questions each (16
   }
 });
 
-test('3. TraceEngine generates valid multi-step memory, stack, and pointer traces starting at Line 1 for all 160 problems', () => {
+test('3. TraceEngine generates valid multi-step memory, stack, and pointer traces starting at Line 1 for all 200 problems', () => {
   for (const problem of PROBLEMS) {
     const steps = generateExecutionTrace(problem.id, problem.defaultInput);
     assert.ok(

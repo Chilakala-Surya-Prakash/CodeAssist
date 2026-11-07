@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { lazy, Suspense, useCallback, useEffect, useMemo, useState } from 'react';
 import { COMPANIES } from './data/companies';
 import { CORE_TOPICS, PROBLEMS } from './data/problems';
 import { CoreTopic, ExecutionStep, Language } from './types/visualizer';
@@ -32,8 +32,13 @@ import {
 } from './utils/soundEngine';
 import { MemoryCanvas } from './components/MemoryCanvas';
 import { CodeEditorPanel } from './components/CodeEditorPanel';
-import { CompanyDirectory } from './components/CompanyDirectory';
-import { TutorDrawer } from './components/TutorDrawer';
+
+const CompanyDirectory = lazy(() =>
+  import('./components/CompanyDirectory').then((m) => ({ default: m.CompanyDirectory }))
+);
+const TutorDrawer = lazy(() =>
+  import('./components/TutorDrawer').then((m) => ({ default: m.TutorDrawer }))
+);
 import {
   Award,
   Bookmark,
@@ -571,7 +576,7 @@ export default function App() {
                 : 'border-transparent'
             }`}
           >
-            Topics &amp; 160 Questions
+            Topics & 200 Questions
           </button>
           <button
             type="button"
@@ -593,7 +598,7 @@ export default function App() {
                 : 'border-transparent'
             }`}
           >
-            Systems &amp; Mock Arena
+            Systems & Mock Arena
           </button>
         </nav>
 
@@ -615,10 +620,10 @@ export default function App() {
           <div className="space-y-5" data-testid="visualizer-studio-view">
             {/* Clean 2-Row Topic & Question Navigator */}
             <div className="rounded-lg border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-[#111111] p-4 space-y-3.5">
-              {/* Row 1: 8 Core Topics Selector (20 Questions Each) */}
+              {/* Row 1: 8 Core Topics Selector (25 Questions Each) */}
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-3 border-b border-neutral-200 dark:border-neutral-800">
                 <span className="text-xs font-mono text-neutral-500 dark:text-neutral-400 shrink-0">
-                  1. Select Topic (20 Questions Each):
+                  1. Select Topic (25 Questions Each):
                 </span>
                 <div className="flex flex-wrap items-center gap-1.5">
                   {CORE_TOPICS.map((tMeta) => {
@@ -776,7 +781,7 @@ export default function App() {
                       WEB AUDIO API DSP CHAIN · HARMONIC OSCILLATOR + BIQUAD FILTER + SPATIAL HEAP PANNER + DYNAMICS COMPRESSOR
                     </div>
                     <h3 className="text-sm font-bold text-neutral-950 dark:text-white">
-                      Algorithmic Memory Sonification &amp; Sound Engineering Rack
+                      Algorithmic Memory Sonification & Sound Engineering Rack
                     </h3>
                   </div>
                   <div className="flex items-center gap-2">
@@ -811,7 +816,7 @@ export default function App() {
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 text-xs font-mono">
                   <div className="p-3 rounded border border-neutral-200 dark:border-neutral-800 bg-neutral-50 dark:bg-neutral-900 space-y-2">
-                    <div className="text-neutral-500 font-semibold">1. OSCILLATOR &amp; GAIN</div>
+                    <div className="text-neutral-500 font-semibold">1. OSCILLATOR & GAIN</div>
                     <label className="block">
                       <span className="text-[11px] text-neutral-500">Waveform Harmonic</span>
                       <select
@@ -970,7 +975,7 @@ export default function App() {
               <div className="rounded-lg border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-[#111111] p-4 space-y-3">
                 <div className="flex flex-wrap items-center justify-between gap-2 pb-2 border-b border-neutral-200 dark:border-neutral-800">
                   <div className="text-xs font-mono font-semibold text-neutral-950 dark:text-white">
-                    BOOKMARKED EXECUTION STEPS &amp; PERSONAL INVARIANT NOTES ({bookmarks.length})
+                    BOOKMARKED EXECUTION STEPS & PERSONAL INVARIANT NOTES ({bookmarks.length})
                   </div>
                   <div className="flex items-center gap-2 w-full sm:w-auto">
                     <input
@@ -992,7 +997,7 @@ export default function App() {
 
                 {bookmarks.length === 0 ? (
                   <p className="text-xs font-mono text-neutral-500">
-                    No steps bookmarked yet. Click &quot;Save Step #{boundedStepIndex + 1}&quot; above to pin this exact memory state and note.
+                    No steps bookmarked yet. Click "Save Step #{boundedStepIndex + 1}" above to pin this exact memory state and note.
                   </p>
                 ) : (
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-2.5">
@@ -1395,27 +1400,31 @@ export default function App() {
         )}
 
         {activeTab === 'companies' && (
-          <CompanyDirectory
-            companies={COMPANIES}
-            problems={PROBLEMS}
-            activeProblemId={selectedProblemId}
-            solvedProblemIds={solvedProblemIds}
-            onToggleSolved={handleToggleSolved}
-            onSelectProblem={handleSelectProblem}
-            mode="companies"
-          />
+          <Suspense fallback={<div className="p-8 text-center text-sm font-mono text-neutral-500">Loading company directory...</div>}>
+            <CompanyDirectory
+              companies={COMPANIES}
+              problems={PROBLEMS}
+              activeProblemId={selectedProblemId}
+              solvedProblemIds={solvedProblemIds}
+              onToggleSolved={handleToggleSolved}
+              onSelectProblem={handleSelectProblem}
+              mode="companies"
+            />
+          </Suspense>
         )}
 
         {activeTab === 'challenges' && (
-          <CompanyDirectory
-            companies={COMPANIES}
-            problems={PROBLEMS}
-            activeProblemId={selectedProblemId}
-            solvedProblemIds={solvedProblemIds}
-            onToggleSolved={handleToggleSolved}
-            onSelectProblem={handleSelectProblem}
-            mode="challenges"
-          />
+          <Suspense fallback={<div className="p-8 text-center text-sm font-mono text-neutral-500">Loading challenges...</div>}>
+            <CompanyDirectory
+              companies={COMPANIES}
+              problems={PROBLEMS}
+              activeProblemId={selectedProblemId}
+              solvedProblemIds={solvedProblemIds}
+              onToggleSolved={handleToggleSolved}
+              onSelectProblem={handleSelectProblem}
+              mode="challenges"
+            />
+          </Suspense>
         )}
 
         {activeTab === 'roadmap' && (
@@ -1428,10 +1437,10 @@ export default function App() {
               <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 pb-4 border-b border-neutral-200 dark:border-neutral-800">
                 <div>
                   <div className="text-xs font-mono text-neutral-500 dark:text-neutral-400">
-                    DISTRIBUTED ARCHITECTURE &amp; OS / HARDWARE CONCURRENCY SIMULATOR
+                    DISTRIBUTED ARCHITECTURE & OS / HARDWARE CONCURRENCY SIMULATOR
                   </div>
                   <h2 className="text-xl font-bold text-neutral-950 dark:text-neutral-100 mt-1">
-                    System Design Packet Tracer &amp; CPU Cache / Mutex Concurrency Lab
+                    System Design Packet Tracer & CPU Cache / Mutex Concurrency Lab
                   </h2>
                   <p className="text-xs sm:text-sm text-neutral-600 dark:text-neutral-400 mt-1">
                     Step through Distributed Consistent Hashing, Redis Stampede Lease Locks, Token Bucket Rate Limiters, CPU 64B Cache Line False Sharing (MESI), and AB-BA Mutex Deadlocks.
@@ -1567,7 +1576,7 @@ export default function App() {
                     45-Minute Onsite Coding Round Simulator · Blind Coding + Live Voice Interviewer
                   </div>
                   <h2 className="text-xl font-bold text-neutral-950 dark:text-neutral-100 mt-1">
-                    Timed Mock Interview &amp; 5-Dimension Hiring Committee Scorecard
+                    Timed Mock Interview & 5-Dimension Hiring Committee Scorecard
                   </h2>
                   <p className="text-xs sm:text-sm text-neutral-600 dark:text-neutral-400 mt-1">
                     Hide the canonical solution with Blind Coding Mode, explain your approach to the Live Voice Interviewer, and generate a 5-dimension L4/L5 hiring rubric evaluation.
@@ -1680,7 +1689,7 @@ export default function App() {
 
                   <div>
                     <label className="block text-xs font-mono text-neutral-500 mb-1">
-                      Candidate Pre-Coding Approach &amp; Complexity Notes (Explain Invariant &amp; Big-O)
+                      Candidate Pre-Coding Approach & Complexity Notes (Explain Invariant & Big-O)
                     </label>
                     <textarea
                       rows={4}
@@ -1709,7 +1718,7 @@ export default function App() {
                     className="w-full py-2.5 px-4 text-xs font-semibold rounded-md bg-neutral-900 text-white dark:bg-neutral-100 dark:text-neutral-950 hover:bg-neutral-800 dark:hover:bg-white transition-colors flex items-center justify-center gap-2"
                   >
                     <Award className="w-4 h-4" />
-                    Submit Round &amp; Generate 5-Dimension Hiring Scorecard
+                    Submit Round & Generate 5-Dimension Hiring Scorecard
                   </button>
                 </div>
 
@@ -1767,17 +1776,19 @@ export default function App() {
       </main>
 
       {/* Live Voice + Academic Tutor Drawer */}
-      <TutorDrawer
-        isOpen={isTutorOpen}
-        onClose={() => setIsTutorOpen(false)}
-        problem={currentProblem}
-        language={language}
-        code={activeCode}
-        currentStep={currentStep}
-        totalSteps={steps.length}
-        onStepCommand={handleStepCommand}
-        voiceTriggerCount={voiceTriggerCount}
-      />
+      <Suspense fallback={null}>
+        <TutorDrawer
+          isOpen={isTutorOpen}
+          onClose={() => setIsTutorOpen(false)}
+          problem={currentProblem}
+          language={language}
+          code={activeCode}
+          currentStep={currentStep}
+          totalSteps={steps.length}
+          onStepCommand={handleStepCommand}
+          voiceTriggerCount={voiceTriggerCount}
+        />
+      </Suspense>
     </div>
   );
 }

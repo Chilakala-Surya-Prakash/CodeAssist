@@ -17,8 +17,12 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 function getGenAIClient(): GoogleGenAI {
+  const apiKey = process.env.GEMINI_API_KEY;
+  if (!apiKey) {
+    throw Object.assign(new Error('GEMINI_API_KEY is not set. Add it to your .env file or deployment secrets.'), { status: 503 });
+  }
   return new GoogleGenAI({
-    apiKey: process.env.GEMINI_API_KEY,
+    apiKey,
     httpOptions: {
       headers: {
         'User-Agent': 'aistudio-build',
@@ -268,7 +272,15 @@ Generate between 4 and 8 key execution steps showing how stack variables, heap o
     let sessionPromise: Promise<any> | null = null;
 
     const initLiveSession = (initialContext?: string) => {
-      const ai = getGenAIClient();
+      let ai: GoogleGenAI;
+      try {
+        ai = getGenAIClient();
+      } catch (err: any) {
+        if (clientWs.readyState === WebSocket.OPEN) {
+          clientWs.send(JSON.stringify({ error: err?.message || 'GEMINI_API_KEY is not configured.' }));
+        }
+        return;
+      }
       sessionPromise = ai.live.connect({
         model: 'gemini-3.8-live',
         config: {
@@ -408,6 +420,9 @@ Generate between 4 and 8 key execution steps showing how stack variables, heap o
   } else {
     const distPath = path.join(__dirname, 'dist');
     app.use(express.static(distPath));
+    app.all('/api/*', (_req, res) => {
+      res.status(404).json({ error: 'API route not found' });
+    });
     app.get('*', (_req, res) => {
       res.sendFile(path.join(distPath, 'index.html'));
     });

@@ -47,7 +47,8 @@ export const TutorDrawer: React.FC<TutorDrawerProps> = ({
   const audioPlayerRef = useRef<LiveAudioPlayer | null>(null);
   const micStreamRef = useRef<MediaStream | null>(null);
   const inputAudioCtxRef = useRef<AudioContext | null>(null);
-  const processorRef = useRef<ScriptProcessorNode | null>(null);
+  // Holds either an AudioWorkletNode (modern) or ScriptProcessorNode (legacy fallback)
+  const processorRef = useRef<AudioWorkletNode | ScriptProcessorNode | null>(null);
   const onStepCommandRef = useRef(onStepCommand);
   const currentStepRef = useRef(currentStep);
 
@@ -217,8 +218,18 @@ export const TutorDrawer: React.FC<TutorDrawerProps> = ({
 
   const toggleMicrophoneStreaming = async () => {
     if (isMicStreaming) {
-      if (processorRef.current) processorRef.current.disconnect();
-      if (micStreamRef.current) micStreamRef.current.getTracks().forEach((t) => t.stop());
+      if (processorRef.current) {
+        processorRef.current.disconnect();
+        processorRef.current = null;
+      }
+      if (micStreamRef.current) {
+        micStreamRef.current.getTracks().forEach((t) => t.stop());
+        micStreamRef.current = null;
+      }
+      if (inputAudioCtxRef.current && inputAudioCtxRef.current.state !== 'closed') {
+        await inputAudioCtxRef.current.close();
+        inputAudioCtxRef.current = null;
+      }
       setIsMicStreaming(false);
       setLiveStatus('Live Connected (Mic Muted)');
       return;
@@ -228,27 +239,91 @@ export const TutorDrawer: React.FC<TutorDrawerProps> = ({
       if (!isLiveVoiceActive) {
         connectLiveVoiceSession(false);
       }
+
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       micStreamRef.current = stream;
 
       const inputCtx = new AudioContext({ sampleRate: 16000 });
       inputAudioCtxRef.current = inputCtx;
       const source = inputCtx.createMediaStreamSource(stream);
-      const processor = inputCtx.createScriptProcessor(4096, 1, 1);
-      processorRef.current = processor;
 
-      source.connect(processor);
-      processor.connect(inputCtx.destination);
-
-      processor.onaudioprocess = (e) => {
+      /** Send a Float32Array PCM chunk over the WebSocket */
+      const sendAudioChunk = (samples: Float32Array) => {
         if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
-          const base64Audio = float32ToBase64Pcm16(e.inputBuffer.getChannelData(0));
-          wsRef.current.send(JSON.stringify({ audio: base64Audio }));
+          wsRef.current.send(JSON.stringify({ audio: float32ToBase64Pcm16(samples) }));
         }
       };
 
-      setIsMicStreaming(true);
-      setLiveStatus('Listening (16kHz PCM) & Speaking (24kHz Audio)');
+      // ── AudioWorklet path (modern browsers: Chrome 66+, FF 76+, Safari 14.5+) ──
+      if (typeof AudioWorkletNode !== 'undefined' && inputCtx.audioWorklet) {
+        /**
+         * Inline worklet processor as a Blob URL — avoids a separate file and
+         * works seamlessly with Vite's asset pipeline with no extra config.
+         *
+         * Buffers 128-sample render quanta up to CHUNK_SIZE before posting to
+         * the main thread via a zero-copy transferable ArrayBuffer.
+         */
+        const workletCode = /* js */ `
+          const CHUNK_SIZE = 4096;
+          class PcmCapture extends AudioWorkletProcessor {
+            constructor() {
+              super();
+              this._buf = new Float32Array(CHUNK_SIZE);
+              this._pos = 0;
+            }
+            process(inputs) {
+              const ch = inputs[0]?.[0];
+              if (!ch) return true;
+              let i = 0;
+              while (i < ch.length) {
+                const space = CHUNK_SIZE - this._pos;
+                const take  = Math.min(space, ch.length - i);
+                this._buf.set(ch.subarray(i, i + take), this._pos);
+                this._pos += take;
+                i         += take;
+                if (this._pos === CHUNK_SIZE) {
+                  // Transfer ownership — zero-copy, no GC pressure
+                  const out = this._buf.buffer;
+                  this._buf = new Float32Array(CHUNK_SIZE);
+                  this._pos = 0;
+                  this.port.postMessage({ chunk: out }, [out]);
+                }
+              }
+              return true; // keep processor alive
+            }
+          }
+          registerProcessor('pcm-capture', PcmCapture);
+        `;
+        const blob      = new Blob([workletCode], { type: 'application/javascript' });
+        const blobUrl   = URL.createObjectURL(blob);
+        await inputCtx.audioWorklet.addModule(blobUrl);
+        URL.revokeObjectURL(blobUrl); // immediately free the object URL
+
+        const workletNode = new AudioWorkletNode(inputCtx, 'pcm-capture');
+        workletNode.port.onmessage = (e: MessageEvent<{ chunk: ArrayBuffer }>) => {
+          sendAudioChunk(new Float32Array(e.data.chunk));
+        };
+
+        source.connect(workletNode);
+        // AudioWorkletNode must be connected to destination to keep the graph running
+        workletNode.connect(inputCtx.destination);
+        processorRef.current = workletNode as unknown as ScriptProcessorNode;
+
+        setIsMicStreaming(true);
+        setLiveStatus('Listening · AudioWorklet 16kHz → Gemini Live 24kHz');
+      } else {
+        // ── Legacy ScriptProcessorNode fallback (older / restricted environments) ──
+        // eslint-disable-next-line @typescript-eslint/no-deprecated
+        const spn = inputCtx.createScriptProcessor(4096, 1, 1);
+        processorRef.current = spn;
+        source.connect(spn);
+        spn.connect(inputCtx.destination);
+        // eslint-disable-next-line @typescript-eslint/no-deprecated
+        spn.onaudioprocess = (e) => sendAudioChunk(e.inputBuffer.getChannelData(0));
+
+        setIsMicStreaming(true);
+        setLiveStatus('Listening · ScriptProcessor 16kHz (legacy) → Gemini Live 24kHz');
+      }
     } catch (err: any) {
       setLiveStatus(`Microphone unavailable: ${err?.message || 'Permission denied'}`);
     }
@@ -327,7 +402,7 @@ export const TutorDrawer: React.FC<TutorDrawerProps> = ({
       <div className="px-4 py-3.5 border-b border-neutral-200 dark:border-neutral-800 flex items-center justify-between">
         <div>
           <div className="text-xs font-mono text-neutral-500 dark:text-neutral-400">
-            Live Voice &amp; Academic Tutor
+            Live Voice & Academic Tutor
           </div>
           <h3 className="text-sm font-bold text-neutral-950 dark:text-neutral-100">
             Real-Time Engineering Mentor
@@ -474,7 +549,7 @@ export const TutorDrawer: React.FC<TutorDrawerProps> = ({
         ))}
         {isLoading && (
           <div className="p-3 rounded-lg bg-neutral-100 dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 text-xs text-neutral-500 font-mono">
-            Analyzing stack &amp; heap state at Step {currentStep.stepIndex + 1}...
+            Analyzing stack & heap state at Step {currentStep.stepIndex + 1}...
           </div>
         )}
       </div>

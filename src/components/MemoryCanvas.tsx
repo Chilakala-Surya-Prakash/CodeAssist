@@ -292,7 +292,7 @@ export const MemoryCanvas: React.FC<MemoryCanvasProps> = ({
           <div className="py-3 space-y-4">
             <div className="p-3 rounded-md bg-neutral-50 dark:bg-neutral-900/60 border border-neutral-200 dark:border-neutral-800">
               <div className="text-xs font-mono text-neutral-500 dark:text-neutral-400 mb-2">
-                Topological Dependency Graph (Directed Edges u → v &amp; Live In-Degrees)
+                Topological Dependency Graph (Directed Edges u → v & Live In-Degrees)
               </div>
               <svg className="w-full h-36" viewBox="0 0 560 130">
                 <defs>
@@ -433,7 +433,7 @@ export const MemoryCanvas: React.FC<MemoryCanvasProps> = ({
             {(problemId === 'trapping-rain-water' || problemId === 'container-most-water') && (
               <div className="mb-5 px-3 pt-4 pb-2 rounded-md bg-neutral-50 dark:bg-neutral-900/60 border border-neutral-200 dark:border-neutral-800">
                 <div className="text-xs font-mono text-neutral-500 dark:text-neutral-400 mb-3">
-                  Elevation &amp; Water Column Profile (Two-Pointer Boundary Scan)
+                  Elevation & Water Column Profile (Two-Pointer Boundary Scan)
                 </div>
                 <div className="h-32 flex items-end gap-2">
                   {primaryHeap.cells.map((cell) => {
@@ -577,7 +577,7 @@ export const MemoryCanvas: React.FC<MemoryCanvasProps> = ({
             <div className="flex items-center gap-2">
               <Layers className="w-4 h-4 text-neutral-700 dark:text-neutral-300" />
               <h4 className="text-sm font-semibold text-neutral-950 dark:text-neutral-100">
-                Call Stack Frame &amp; Registers
+                Call Stack Frame & Registers
               </h4>
             </div>
             <span className="text-xs font-mono text-neutral-500">
@@ -628,7 +628,7 @@ export const MemoryCanvas: React.FC<MemoryCanvasProps> = ({
               <div className="flex items-center gap-2 min-w-0">
                 <Cpu className="w-4 h-4 text-neutral-700 dark:text-neutral-300 shrink-0" />
                 <h4 className="text-sm font-semibold text-neutral-950 dark:text-neutral-100 truncate">
-                  Pointer Vector &amp; Memory Mutation
+                  Pointer Vector & Memory Mutation
                 </h4>
               </div>
               <span className="text-xs font-mono text-neutral-500 dark:text-neutral-400 shrink-0">
@@ -678,7 +678,7 @@ export const MemoryCanvas: React.FC<MemoryCanvasProps> = ({
             <div className="flex items-center gap-2">
               <GitBranch className="w-4 h-4 text-neutral-700 dark:text-neutral-300" />
               <h4 className="text-sm font-semibold text-neutral-950 dark:text-neutral-100">
-                Recursion Call-Tree &amp; Backtracking / Memoization Flamegraph
+                Recursion Call-Tree & Backtracking / Memoization Flamegraph
               </h4>
             </div>
             <div className="flex items-center gap-3 text-[11px] font-mono text-neutral-500">

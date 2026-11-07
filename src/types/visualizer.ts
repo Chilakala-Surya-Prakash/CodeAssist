@@ -115,10 +115,10 @@ export interface ProblemSolution {
 
 export interface AlgorithmProblem {
   id: string;
-  number: number; // Sequential 1..160
-  topicCode?: string; // Authentic topic code e.g. ARR-01 .. ARR-20
+  number: number; // Sequential 1..200
+  topicCode?: string; // Authentic topic code e.g. ARR-01 .. ARR-25
   topic?: CoreTopic;
-  topicIndex?: number; // 1..20 within topic
+  topicIndex?: number; // 1..25 within topic
   traceFamilyId?: string; // Underlying trace archetype id
   title: string;
   slug: string;

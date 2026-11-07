@@ -10,7 +10,7 @@ export const COMPANIES: CompanyProfile[] = [
     interviewBarSummary: 'Emphasizes optimal asymptotic bounds, graph/tree traversals, sliding window invariants, and explicit edge-case memory handling.',
     preferredLanguages: ['Python', 'Java', 'C++', 'Go'],
     signaturePatterns: ['Sliding Window', 'Trees & Graphs', 'Dynamic Programming', 'Two Pointers'],
-    totalCuratedQuestions: 142,
+    totalCuratedQuestions: 184,
     featuredQuestions: [
       { problemId: 'trapping-rain-water', frequency: '96%', roundType: 'Onsite Coding', interviewerFocus: 'Dual-pointer O(1) auxiliary heap space vs O(N) prefix arrays.' },
       { problemId: 'lru-cache-pointers', frequency: '93%', roundType: 'Onsite Coding', interviewerFocus: 'Doubly-linked list pointer splicing + HashMap node reference synchronization.' },
@@ -28,7 +28,7 @@ export const COMPANIES: CompanyProfile[] = [
     interviewBarSummary: 'High-speed execution: expects 2 medium/hard problems in 40 minutes with bug-free dry runs and zero extra memory allocations where O(1) exists.',
     preferredLanguages: ['Python', 'Java', 'C++'],
     signaturePatterns: ['Two Pointers', 'Sliding Window', 'Trees & Graphs', 'Monotonic Stack'],
-    totalCuratedQuestions: 138,
+    totalCuratedQuestions: 184,
     featuredQuestions: [
       { problemId: 'three-sum-zero', frequency: '97%', roundType: 'Phone Screen', interviewerFocus: 'Sorting in-place + skipping duplicate pointer values cleanly.' },
       { problemId: 'trapping-rain-water', frequency: '94%', roundType: 'Onsite Coding', interviewerFocus: 'Tracing lMax and rMax register updates step-by-step.' },
@@ -46,7 +46,7 @@ export const COMPANIES: CompanyProfile[] = [
     interviewBarSummary: 'Pairs Leadership Principles with production-grade data structure manipulation: LRU caches, monotonic stacks, heaps, and BFS graphs.',
     preferredLanguages: ['Java', 'Python', 'C++'],
     signaturePatterns: ['Linked List & Pointers', 'Heap & Priority Queue', 'Monotonic Stack', 'Trees & Graphs'],
-    totalCuratedQuestions: 156,
+    totalCuratedQuestions: 184,
     featuredQuestions: [
       { problemId: 'lru-cache-pointers', frequency: '98%', roundType: 'Bar Raiser / Core', interviewerFocus: 'Thread-safe awareness, dummy head/tail sentinel nodes in Java/Python.' },
       { problemId: 'two-sum-hash', frequency: '95%', roundType: 'Phone Screen', interviewerFocus: 'Single-pass hash table lookup and collision amortized cost.' },
@@ -64,7 +64,7 @@ export const COMPANIES: CompanyProfile[] = [
     interviewBarSummary: 'Deep systems-level thinking: memory layout, cache locality, pointer mutation safety, and clean object lifecycle in Java and Python.',
     preferredLanguages: ['Java', 'Python', 'Swift', 'C++'],
     signaturePatterns: ['Linked List & Pointers', 'Two Pointers', 'Binary Search', 'Dynamic Programming'],
-    totalCuratedQuestions: 112,
+    totalCuratedQuestions: 137,
     featuredQuestions: [
       { problemId: 'reverse-linked-list', frequency: '94%', roundType: 'Phone Screen', interviewerFocus: 'Exact order of pointer assignment: nxt = curr.next before rewiring.' },
       { problemId: 'cycle-detection-floyd', frequency: '91%', roundType: 'Onsite Coding', interviewerFocus: 'Floyd tortoise & hare pointer phase-2 entry node proof.' },
@@ -81,7 +81,7 @@ export const COMPANIES: CompanyProfile[] = [
     interviewBarSummary: 'Strong focus on linked lists, trees, matrix/graph traversals, and clear modular code with explicit null-pointer guards.',
     preferredLanguages: ['Java', 'Python', 'C#', 'C++'],
     signaturePatterns: ['Linked List & Pointers', 'Trees & Graphs', 'Binary Search', 'Dynamic Programming'],
-    totalCuratedQuestions: 129,
+    totalCuratedQuestions: 139,
     featuredQuestions: [
       { problemId: 'reverse-linked-list', frequency: '95%', roundType: 'Phone Screen', interviewerFocus: 'Null head and single-node edge cases during pointer flip.' },
       { problemId: 'lru-cache-pointers', frequency: '92%', roundType: 'Onsite Coding', interviewerFocus: 'O(1) get and put via doubly linked nodes.' },
@@ -98,7 +98,7 @@ export const COMPANIES: CompanyProfile[] = [
     interviewBarSummary: 'Senior-heavy bar focusing on caching policies, streaming window algorithms, top-K priority queues, and latency-predictable memory structures.',
     preferredLanguages: ['Java', 'Python', 'Go'],
     signaturePatterns: ['Linked List & Pointers', 'Sliding Window', 'Heap & Priority Queue', 'Two Pointers'],
-    totalCuratedQuestions: 78,
+    totalCuratedQuestions: 107,
     featuredQuestions: [
       { problemId: 'lru-cache-pointers', frequency: '97%', roundType: 'System & Algo', interviewerFocus: 'Eviction determinism and O(1) doubly-linked pointer splice.' },
       { problemId: 'kth-largest-heap', frequency: '92%', roundType: 'Onsite Coding', interviewerFocus: 'Bounded min-heap memory stability on high-volume streams.' },
@@ -114,7 +114,7 @@ export const COMPANIES: CompanyProfile[] = [
     interviewBarSummary: 'Focuses on contiguous array memory layouts, pointer arithmetic analogies, bit/index manipulation, and dependency DAG scheduling.',
     preferredLanguages: ['Python', 'C++', 'Java'],
     signaturePatterns: ['Two Pointers', 'Binary Search', 'Trees & Graphs', 'Dynamic Programming'],
-    totalCuratedQuestions: 94,
+    totalCuratedQuestions: 74,
     featuredQuestions: [
       { problemId: 'course-schedule-cycle', frequency: '95%', roundType: 'Onsite Coding', interviewerFocus: 'CUDA kernel / compute graph dependency topological ordering.' },
       { problemId: 'trapping-rain-water', frequency: '91%', roundType: 'Onsite Coding', interviewerFocus: 'Memory-bandwidth optimal single pass with two pointers.' },
@@ -130,7 +130,7 @@ export const COMPANIES: CompanyProfile[] = [
     interviewBarSummary: 'Known for rigorous algorithmic depth: monotonic stacks, dynamic programming, hard sliding windows, and tree/linked-list hybrids.',
     preferredLanguages: ['Python', 'Java', 'Go', 'C++'],
     signaturePatterns: ['Monotonic Stack', 'Dynamic Programming', 'Sliding Window', 'Linked List & Pointers'],
-    totalCuratedQuestions: 134,
+    totalCuratedQuestions: 122,
     featuredQuestions: [
       { problemId: 'trapping-rain-water', frequency: '96%', roundType: 'Onsite Coding', interviewerFocus: 'Both two-pointer and monotonic stack derivations required.' },
       { problemId: 'daily-temperatures-stack', frequency: '92%', roundType: 'Phone Screen', interviewerFocus: 'Monotonic stack O(N) amortized push/pop count proof.' },
@@ -146,7 +146,7 @@ export const COMPANIES: CompanyProfile[] = [
     interviewBarSummary: 'High bar on feed-ranking primitives: top-K heaps, sliding windows, graph BFS, and pointer-heavy cache structures.',
     preferredLanguages: ['Python', 'Java', 'Go'],
     signaturePatterns: ['Heap & Priority Queue', 'Sliding Window', 'Monotonic Stack', 'Trees & Graphs'],
-    totalCuratedQuestions: 118,
+    totalCuratedQuestions: 122,
     featuredQuestions: [
       { problemId: 'kth-largest-heap', frequency: '94%', roundType: 'Phone Screen', interviewerFocus: 'Top-K candidate selection in O(N log K) time.' },
       { problemId: 'longest-substring-unique', frequency: '91%', roundType: 'Phone Screen', interviewerFocus: 'Session window uniqueness with hash map index jumps.' },
@@ -162,7 +162,7 @@ export const COMPANIES: CompanyProfile[] = [
     interviewBarSummary: 'Core database & cloud infrastructure focus: B-tree/binary tree traversals, LRU buffer pool management, and binary search.',
     preferredLanguages: ['Java', 'Python', 'C++'],
     signaturePatterns: ['Trees & Graphs', 'Linked List & Pointers', 'Binary Search', 'Heap & Priority Queue'],
-    totalCuratedQuestions: 105,
+    totalCuratedQuestions: 106,
     featuredQuestions: [
       { problemId: 'lru-cache-pointers', frequency: '95%', roundType: 'Onsite Coding', interviewerFocus: 'Database buffer pool page pinning and LRU list manipulation.' },
       { problemId: 'binary-tree-level-order', frequency: '91%', roundType: 'Phone Screen', interviewerFocus: 'Tree index traversal and level boundary tracking.' },
@@ -178,7 +178,7 @@ export const COMPANIES: CompanyProfile[] = [
     interviewBarSummary: 'Prioritizes deterministic memory usage, graph pathfinding, sensor window filtering, and zero-overhead pointer algorithms.',
     preferredLanguages: ['Python', 'C++', 'Java'],
     signaturePatterns: ['Two Pointers', 'Trees & Graphs', 'Sliding Window', 'Binary Search'],
-    totalCuratedQuestions: 82,
+    totalCuratedQuestions: 77,
     featuredQuestions: [
       { problemId: 'cycle-detection-floyd', frequency: '92%', roundType: 'Phone Screen', interviewerFocus: 'Constant-space O(1) loop detection without hash set allocation.' },
       { problemId: 'course-schedule-cycle', frequency: '89%', roundType: 'Onsite Coding', interviewerFocus: 'Autonomous task DAG scheduling and cycle rejection.' },
@@ -194,7 +194,7 @@ export const COMPANIES: CompanyProfile[] = [
     interviewBarSummary: 'Strict memory bounds: static/bounded buffers, cycle detection, binary search on telemetry streams, and DAG validation.',
     preferredLanguages: ['Python', 'C++', 'Java'],
     signaturePatterns: ['Binary Search', 'Linked List & Pointers', 'Trees & Graphs', 'Two Pointers'],
-    totalCuratedQuestions: 68,
+    totalCuratedQuestions: 76,
     featuredQuestions: [
       { problemId: 'search-rotated-sorted', frequency: '93%', roundType: 'Phone Screen', interviewerFocus: 'Ring-buffer timestamp binary search after wrap-around.' },
       { problemId: 'cycle-detection-floyd', frequency: '90%', roundType: 'Onsite Coding', interviewerFocus: 'Zero-heap-allocation state loop detection.' },
@@ -212,7 +212,7 @@ export const COMPANIES: CompanyProfile[] = [
     interviewBarSummary: 'Practical, high-complexity data structures: KV-cache eviction (LRU), dependency graphs, token windowing, and clean extensible code.',
     preferredLanguages: ['Python', 'Java', 'C++'],
     signaturePatterns: ['Linked List & Pointers', 'Sliding Window', 'Trees & Graphs', 'Heap & Priority Queue'],
-    totalCuratedQuestions: 64,
+    totalCuratedQuestions: 132,
     featuredQuestions: [
       { problemId: 'lru-cache-pointers', frequency: '96%', roundType: 'Onsite Coding', interviewerFocus: 'KV-cache page eviction with O(1) pointer splice.' },
       { problemId: 'course-schedule-cycle', frequency: '92%', roundType: 'Onsite Coding', interviewerFocus: 'Compute graph topological execution order.' },
@@ -228,7 +228,7 @@ export const COMPANIES: CompanyProfile[] = [
     interviewBarSummary: 'Deep emphasis on correctness invariants, stateful stream parsing, stack machines, and caching under memory constraints.',
     preferredLanguages: ['Python', 'Java', 'Rust', 'C++'],
     signaturePatterns: ['Linked List & Pointers', 'Monotonic Stack', 'Trees & Graphs', 'Dynamic Programming'],
-    totalCuratedQuestions: 58,
+    totalCuratedQuestions: 104,
     featuredQuestions: [
       { problemId: 'lru-cache-pointers', frequency: '95%', roundType: 'Onsite Coding', interviewerFocus: 'Prefix cache eviction invariants and reference integrity.' },
       { problemId: 'valid-parentheses-stack', frequency: '90%', roundType: 'Phone Screen', interviewerFocus: 'Streaming structured grammar/delimiter validation.' },
@@ -244,7 +244,7 @@ export const COMPANIES: CompanyProfile[] = [
     interviewBarSummary: 'Combines algorithmic rigor in dynamic programming, graph search (BFS/DFS), and memory-efficient tree representations.',
     preferredLanguages: ['Python', 'C++', 'Java'],
     signaturePatterns: ['Dynamic Programming', 'Trees & Graphs', 'Heap & Priority Queue', 'Binary Search'],
-    totalCuratedQuestions: 62,
+    totalCuratedQuestions: 114,
     featuredQuestions: [
       { problemId: 'coin-change-dp', frequency: '94%', roundType: 'Onsite Coding', interviewerFocus: 'Bellman optimality equation & state table transition.' },
       { problemId: 'binary-tree-level-order', frequency: '90%', roundType: 'Phone Screen', interviewerFocus: 'Search tree frontier expansion and memory bounds.' },
@@ -260,7 +260,7 @@ export const COMPANIES: CompanyProfile[] = [
     interviewBarSummary: 'Fast-paced coding rounds testing graph workflows, priority queues, sliding windows, and clean full-stack data structures.',
     preferredLanguages: ['Python', 'Java', 'TypeScript'],
     signaturePatterns: ['Trees & Graphs', 'Heap & Priority Queue', 'Sliding Window', 'Two Pointers'],
-    totalCuratedQuestions: 54,
+    totalCuratedQuestions: 89,
     featuredQuestions: [
       { problemId: 'course-schedule-cycle', frequency: '93%', roundType: 'Onsite Coding', interviewerFocus: 'Annotation pipeline task dependency resolution.' },
       { problemId: 'kth-largest-heap', frequency: '89%', roundType: 'Phone Screen', interviewerFocus: 'Priority queue scoring and top-K batching.' },
@@ -276,7 +276,7 @@ export const COMPANIES: CompanyProfile[] = [
     interviewBarSummary: 'Robotics and perception algorithms: spatial search, monotonic queues/stacks, graph shortest paths, and deterministic memory.',
     preferredLanguages: ['C++', 'Python', 'Java'],
     signaturePatterns: ['Trees & Graphs', 'Monotonic Stack', 'Binary Search', 'Two Pointers'],
-    totalCuratedQuestions: 71,
+    totalCuratedQuestions: 117,
     featuredQuestions: [
       { problemId: 'trapping-rain-water', frequency: '91%', roundType: 'Onsite Coding', interviewerFocus: 'LiDAR elevation scan depression/occlusion calculation.' },
       { problemId: 'daily-temperatures-stack', frequency: '88%', roundType: 'Phone Screen', interviewerFocus: 'Monotonic stack horizon detection.' },
@@ -292,7 +292,7 @@ export const COMPANIES: CompanyProfile[] = [
     interviewBarSummary: 'Search & retrieval engineering: top-K ranking heaps, LRU query caches, string windowing, and low-latency graph traversal.',
     preferredLanguages: ['Python', 'Java', 'C++'],
     signaturePatterns: ['Heap & Priority Queue', 'Linked List & Pointers', 'Sliding Window', 'Binary Search'],
-    totalCuratedQuestions: 49,
+    totalCuratedQuestions: 88,
     featuredQuestions: [
       { problemId: 'kth-largest-heap', frequency: '95%', roundType: 'Phone Screen', interviewerFocus: 'Top-K document reranking with bounded min-heap.' },
       { problemId: 'lru-cache-pointers', frequency: '92%', roundType: 'Onsite Coding', interviewerFocus: 'Semantic query cache O(1) hit promotion.' },
@@ -308,7 +308,7 @@ export const COMPANIES: CompanyProfile[] = [
     interviewBarSummary: 'Famous for tough algorithmic interviews: DAG query planning, LRU memory management, monotonic stacks, and external/heap sorting.',
     preferredLanguages: ['Java', 'Python', 'Scala', 'C++'],
     signaturePatterns: ['Trees & Graphs', 'Linked List & Pointers', 'Heap & Priority Queue', 'Monotonic Stack'],
-    totalCuratedQuestions: 96,
+    totalCuratedQuestions: 117,
     featuredQuestions: [
       { problemId: 'course-schedule-cycle', frequency: '96%', roundType: 'Onsite Coding', interviewerFocus: 'Spark DAG stage dependency cycle detection & ordering.' },
       { problemId: 'lru-cache-pointers', frequency: '93%', roundType: 'Onsite Coding', interviewerFocus: 'Off-heap/in-memory cache block replacement.' },
@@ -343,7 +343,7 @@ export const COMPANIES: CompanyProfile[] = [
     interviewBarSummary: 'Deep focus on state invariants, functional/imperative pointer trade-offs, order-book priority queues, and cycle/graph reasoning.',
     preferredLanguages: ['OCaml', 'Python', 'Java', 'C++'],
     signaturePatterns: ['Monotonic Stack', 'Heap & Priority Queue', 'Trees & Graphs', 'Dynamic Programming'],
-    totalCuratedQuestions: 84,
+    totalCuratedQuestions: 102,
     featuredQuestions: [
       { problemId: 'lru-cache-pointers', frequency: '93%', roundType: 'Onsite Coding', interviewerFocus: 'State transition invariants on every pointer mutation.' },
       { problemId: 'daily-temperatures-stack', frequency: '90%', roundType: 'Phone Screen', interviewerFocus: 'Stack invariant proof across price ticks.' },
@@ -359,7 +359,7 @@ export const COMPANIES: CompanyProfile[] = [
     interviewBarSummary: 'Strong emphasis on algorithmic modeling, sliding window statistics, dynamic programming, and graph connectivity.',
     preferredLanguages: ['Python', 'Java', 'C++'],
     signaturePatterns: ['Sliding Window', 'Dynamic Programming', 'Two Pointers', 'Trees & Graphs'],
-    totalCuratedQuestions: 91,
+    totalCuratedQuestions: 102,
     featuredQuestions: [
       { problemId: 'longest-substring-unique', frequency: '92%', roundType: 'Phone Screen', interviewerFocus: 'Rolling window invariant over high-frequency streams.' },
       { problemId: 'coin-change-dp', frequency: '89%', roundType: 'Onsite Coding', interviewerFocus: 'Dynamic programming memoization vs tabulation memory.' },
@@ -375,7 +375,7 @@ export const COMPANIES: CompanyProfile[] = [
     interviewBarSummary: 'Systems & low-latency focus: pointer layouts, ring buffers, binary search in shifted buffers, and O(1) memory algorithms.',
     preferredLanguages: ['C++', 'Python', 'Java'],
     signaturePatterns: ['Two Pointers', 'Linked List & Pointers', 'Binary Search', 'Monotonic Stack'],
-    totalCuratedQuestions: 76,
+    totalCuratedQuestions: 102,
     featuredQuestions: [
       { problemId: 'cycle-detection-floyd', frequency: '94%', roundType: 'Phone Screen', interviewerFocus: 'Pointer chasing overhead and Floyd O(1) space proof.' },
       { problemId: 'search-rotated-sorted', frequency: '91%', roundType: 'Phone Screen', interviewerFocus: 'Circular buffer binary search index math.' },
@@ -391,7 +391,7 @@ export const COMPANIES: CompanyProfile[] = [
     interviewBarSummary: 'Classic algorithmic benchmarks: Trapping Rain Water is their #1 most famous interview question, alongside DP and hash/pointer problems.',
     preferredLanguages: ['Java', 'Python', 'C++'],
     signaturePatterns: ['Two Pointers', 'Dynamic Programming', 'Sliding Window', 'Hash & Array' as any],
-    totalCuratedQuestions: 124,
+    totalCuratedQuestions: 87,
     featuredQuestions: [
       { problemId: 'trapping-rain-water', frequency: '99%', roundType: 'Onsite Coding', interviewerFocus: 'Signature Goldman question: expects O(N) time and O(1) space two-pointer trace.' },
       { problemId: 'coin-change-dp', frequency: '93%', roundType: 'Phone Screen', interviewerFocus: 'Minimum denomination count via bottom-up DP.' },
@@ -407,7 +407,7 @@ export const COMPANIES: CompanyProfile[] = [
     interviewBarSummary: 'Strong focus on Java memory model, collections internals (HashMap/LinkedHashMap), LRU caches, and tree/linked-list algorithms.',
     preferredLanguages: ['Java', 'Python', 'C++'],
     signaturePatterns: ['Linked List & Pointers', 'Trees & Graphs', 'Dynamic Programming', 'Two Pointers'],
-    totalCuratedQuestions: 98,
+    totalCuratedQuestions: 88,
     featuredQuestions: [
       { problemId: 'lru-cache-pointers', frequency: '95%', roundType: 'Onsite Coding', interviewerFocus: 'Internal pointer mechanics of LinkedHashMap vs custom Node class.' },
       { problemId: 'reverse-linked-list', frequency: '91%', roundType: 'Phone Screen', interviewerFocus: 'Iterative vs recursive stack frame overhead in JVM.' },
@@ -423,7 +423,7 @@ export const COMPANIES: CompanyProfile[] = [
     interviewBarSummary: 'Tests practical core algorithms: valid parentheses/parsers, coin change DP, two-sum variants, and linked-list cycle detection.',
     preferredLanguages: ['Java', 'Python'],
     signaturePatterns: ['Dynamic Programming', 'Monotonic Stack', 'Two Pointers', 'Linked List & Pointers'],
-    totalCuratedQuestions: 115,
+    totalCuratedQuestions: 86,
     featuredQuestions: [
       { problemId: 'valid-parentheses-stack', frequency: '96%', roundType: 'Phone Screen', interviewerFocus: 'Stack lifo invariants for transaction expression validation.' },
       { problemId: 'coin-change-dp', frequency: '93%', roundType: 'Onsite Coding', interviewerFocus: 'Settlement denomination optimization via DP.' },
@@ -441,7 +441,7 @@ export const COMPANIES: CompanyProfile[] = [
     interviewBarSummary: 'Pragmatic, clean, bug-free code: string/delimiter parsing, dependency graphs, rate-limiter sliding windows, and state maps.',
     preferredLanguages: ['Python', 'Java', 'Ruby', 'Go'],
     signaturePatterns: ['Sliding Window', 'Monotonic Stack', 'Trees & Graphs', 'Linked List & Pointers'],
-    totalCuratedQuestions: 74,
+    totalCuratedQuestions: 106,
     featuredQuestions: [
       { problemId: 'valid-parentheses-stack', frequency: '93%', roundType: 'Phone Screen', interviewerFocus: 'Header/token delimiter validation using an explicit stack.' },
       { problemId: 'course-schedule-cycle', frequency: '90%', roundType: 'Onsite Coding', interviewerFocus: 'Ledger settlement dependency graph resolution.' },
@@ -457,7 +457,7 @@ export const COMPANIES: CompanyProfile[] = [
     interviewBarSummary: 'Heavy on graphs, BFS/DFS, priority queues (dispatch matching), monotonic stacks, and sliding windows.',
     preferredLanguages: ['Java', 'Python', 'Go', 'C++'],
     signaturePatterns: ['Trees & Graphs', 'Heap & Priority Queue', 'Sliding Window', 'Monotonic Stack'],
-    totalCuratedQuestions: 132,
+    totalCuratedQuestions: 138,
     featuredQuestions: [
       { problemId: 'course-schedule-cycle', frequency: '95%', roundType: 'Onsite Coding', interviewerFocus: 'Trip state & route dependency graph resolution.' },
       { problemId: 'kth-largest-heap', frequency: '92%', roundType: 'Phone Screen', interviewerFocus: 'Nearest-K driver priority queue maintenance.' },
@@ -473,7 +473,7 @@ export const COMPANIES: CompanyProfile[] = [
     interviewBarSummary: 'Famous for challenging coding rounds requiring clean custom data structures, DP, graph traversal, and pointer precision.',
     preferredLanguages: ['Java', 'Python', 'TypeScript'],
     signaturePatterns: ['Dynamic Programming', 'Trees & Graphs', 'Linked List & Pointers', 'Two Pointers'],
-    totalCuratedQuestions: 89,
+    totalCuratedQuestions: 107,
     featuredQuestions: [
       { problemId: 'coin-change-dp', frequency: '94%', roundType: 'Onsite Coding', interviewerFocus: 'Booking night-combination DP state transitions.' },
       { problemId: 'trapping-rain-water', frequency: '91%', roundType: 'Onsite Coding', interviewerFocus: 'Terrain/water volume visualization and pointer updates.' },
@@ -489,7 +489,7 @@ export const COMPANIES: CompanyProfile[] = [
     interviewBarSummary: 'Practical order-book and transaction matching problems: heaps, hash maps, DAG ordering, and stack validation.',
     preferredLanguages: ['Go', 'Python', 'Java'],
     signaturePatterns: ['Heap & Priority Queue', 'Trees & Graphs', 'Two Pointers', 'Monotonic Stack'],
-    totalCuratedQuestions: 72,
+    totalCuratedQuestions: 69,
     featuredQuestions: [
       { problemId: 'kth-largest-heap', frequency: '93%', roundType: 'Phone Screen', interviewerFocus: 'Order-book top-K liquidity depth via min-heap.' },
       { problemId: 'course-schedule-cycle', frequency: '90%', roundType: 'Onsite Coding', interviewerFocus: 'Nonce/transaction dependency DAG ordering.' },
@@ -505,7 +505,7 @@ export const COMPANIES: CompanyProfile[] = [
     interviewBarSummary: 'Focuses on financial time-series algorithms: monotonic stacks, two pointers, sliding windows, and priority queues.',
     preferredLanguages: ['Python', 'Java', 'Go'],
     signaturePatterns: ['Monotonic Stack', 'Sliding Window', 'Two Pointers', 'Heap & Priority Queue'],
-    totalCuratedQuestions: 69,
+    totalCuratedQuestions: 70,
     featuredQuestions: [
       { problemId: 'daily-temperatures-stack', frequency: '95%', roundType: 'Phone Screen', interviewerFocus: 'Days until higher stock close via monotonic stack.' },
       { problemId: 'trapping-rain-water', frequency: '90%', roundType: 'Onsite Coding', interviewerFocus: 'Drawdown trough accumulation with two pointers.' },
@@ -521,7 +521,7 @@ export const COMPANIES: CompanyProfile[] = [
     interviewBarSummary: 'Clean object-oriented and algorithmic execution in Java/Python: linked lists, hash tables, DP for change-making, and trees.',
     preferredLanguages: ['Java', 'Python', 'Kotlin', 'Go'],
     signaturePatterns: ['Dynamic Programming', 'Linked List & Pointers', 'Two Pointers', 'Trees & Graphs'],
-    totalCuratedQuestions: 77,
+    totalCuratedQuestions: 70,
     featuredQuestions: [
       { problemId: 'coin-change-dp', frequency: '95%', roundType: 'Phone Screen', interviewerFocus: 'POS register minimum coin/bill change calculation.' },
       { problemId: 'lru-cache-pointers', frequency: '90%', roundType: 'Onsite Coding', interviewerFocus: 'Merchant session cache pointer operations.' },
@@ -537,7 +537,7 @@ export const COMPANIES: CompanyProfile[] = [
     interviewBarSummary: 'Dispatch and logistics optimization: BFS level traversal, topological sort, binary search, and monotonic stacks.',
     preferredLanguages: ['Python', 'Java', 'Kotlin', 'Go'],
     signaturePatterns: ['Trees & Graphs', 'Binary Search', 'Heap & Priority Queue', 'Monotonic Stack'],
-    totalCuratedQuestions: 93,
+    totalCuratedQuestions: 76,
     featuredQuestions: [
       { problemId: 'course-schedule-cycle', frequency: '94%', roundType: 'Onsite Coding', interviewerFocus: 'Multi-stop delivery precedence validation.' },
       { problemId: 'binary-tree-level-order', frequency: '90%', roundType: 'Phone Screen', interviewerFocus: 'BFS radius ring expansion from merchant node.' },
@@ -553,7 +553,7 @@ export const COMPANIES: CompanyProfile[] = [
     interviewBarSummary: 'Practical problem solving around lookup tables, binary search, sliding windows, and two-pointer basket matching.',
     preferredLanguages: ['Python', 'Ruby', 'Java', 'Go'],
     signaturePatterns: ['Two Pointers', 'Binary Search', 'Sliding Window', 'Linked List & Pointers'],
-    totalCuratedQuestions: 64,
+    totalCuratedQuestions: 72,
     featuredQuestions: [
       { problemId: 'two-sum-hash', frequency: '93%', roundType: 'Phone Screen', interviewerFocus: 'Promo bundle item pair lookup in O(N).' },
       { problemId: 'search-rotated-sorted', frequency: '89%', roundType: 'Phone Screen', interviewerFocus: 'Sorted catalog shard binary search.' },
@@ -569,7 +569,7 @@ export const COMPANIES: CompanyProfile[] = [
     interviewBarSummary: 'Focuses on stateful data structures (LRU Cache, Min-Heap), graph BFS, and two-pointer interval/array scans.',
     preferredLanguages: ['Python', 'Java', 'Go'],
     signaturePatterns: ['Linked List & Pointers', 'Heap & Priority Queue', 'Trees & Graphs', 'Two Pointers'],
-    totalCuratedQuestions: 75,
+    totalCuratedQuestions: 70,
     featuredQuestions: [
       { problemId: 'lru-cache-pointers', frequency: '95%', roundType: 'Onsite Coding', interviewerFocus: 'Live coding a complete LRU cache with custom Node pointers.' },
       { problemId: 'trapping-rain-water', frequency: '89%', roundType: 'Onsite Coding', interviewerFocus: 'Two-pointer memory efficiency.' },
@@ -585,7 +585,7 @@ export const COMPANIES: CompanyProfile[] = [
     interviewBarSummary: 'Playlist & streaming data structures: doubly-linked queues, sliding windows, top-K heaps, and hash maps.',
     preferredLanguages: ['Java', 'Python', 'C++'],
     signaturePatterns: ['Linked List & Pointers', 'Sliding Window', 'Heap & Priority Queue', 'Two Pointers'],
-    totalCuratedQuestions: 71,
+    totalCuratedQuestions: 102,
     featuredQuestions: [
       { problemId: 'lru-cache-pointers', frequency: '93%', roundType: 'Onsite Coding', interviewerFocus: 'Offline audio track cache eviction with O(1) pointer updates.' },
       { problemId: 'longest-substring-unique', frequency: '90%', roundType: 'Phone Screen', interviewerFocus: 'Longest repeat-free playback window.' },
@@ -601,7 +601,7 @@ export const COMPANIES: CompanyProfile[] = [
     interviewBarSummary: 'Graph algorithms, BFS/DFS, dynamic programming, and low-memory mobile-friendly pointer manipulation.',
     preferredLanguages: ['Java', 'Python', 'C++'],
     signaturePatterns: ['Trees & Graphs', 'Dynamic Programming', 'Linked List & Pointers', 'Sliding Window'],
-    totalCuratedQuestions: 83,
+    totalCuratedQuestions: 102,
     featuredQuestions: [
       { problemId: 'course-schedule-cycle', frequency: '92%', roundType: 'Onsite Coding', interviewerFocus: 'Lens filter render graph topological sort.' },
       { problemId: 'lru-cache-pointers', frequency: '90%', roundType: 'Onsite Coding', interviewerFocus: 'Story media memory cache eviction.' },
@@ -617,7 +617,7 @@ export const COMPANIES: CompanyProfile[] = [
     interviewBarSummary: 'Feed ranking & visual discovery: heaps, graphs, binary search, and dynamic programming.',
     preferredLanguages: ['Python', 'Java', 'C++'],
     signaturePatterns: ['Heap & Priority Queue', 'Trees & Graphs', 'Binary Search', 'Two Pointers'],
-    totalCuratedQuestions: 79,
+    totalCuratedQuestions: 102,
     featuredQuestions: [
       { problemId: 'kth-largest-heap', frequency: '92%', roundType: 'Phone Screen', interviewerFocus: 'Pin feed candidate top-K heap.' },
       { problemId: 'course-schedule-cycle', frequency: '89%', roundType: 'Onsite Coding', interviewerFocus: 'Taxonomy DAG cycle check.' },
@@ -633,7 +633,7 @@ export const COMPANIES: CompanyProfile[] = [
     interviewBarSummary: 'Economic graph traversal (1st/2nd/3rd degree BFS), tree level-order, cycle detection, and thread-safe caches.',
     preferredLanguages: ['Java', 'Python', 'Scala'],
     signaturePatterns: ['Trees & Graphs', 'Linked List & Pointers', 'Two Pointers', 'Binary Search'],
-    totalCuratedQuestions: 104,
+    totalCuratedQuestions: 105,
     featuredQuestions: [
       { problemId: 'binary-tree-level-order', frequency: '96%', roundType: 'Phone Screen', interviewerFocus: 'Connection degree BFS frontier expansion.' },
       { problemId: 'cycle-detection-floyd', frequency: '91%', roundType: 'Phone Screen', interviewerFocus: 'Reference chain loop detection.' },
@@ -651,7 +651,7 @@ export const COMPANIES: CompanyProfile[] = [
     interviewBarSummary: 'Database internals & distributed execution: query DAG scheduling, buffer cache LRU, binary search on micro-partitions, and DP.',
     preferredLanguages: ['Java', 'C++', 'Python'],
     signaturePatterns: ['Linked List & Pointers', 'Binary Search', 'Trees & Graphs', 'Dynamic Programming'],
-    totalCuratedQuestions: 88,
+    totalCuratedQuestions: 65,
     featuredQuestions: [
       { problemId: 'lru-cache-pointers', frequency: '96%', roundType: 'Onsite Coding', interviewerFocus: 'Warehouse local SSD/RAM page eviction pointer splice.' },
       { problemId: 'search-rotated-sorted', frequency: '91%', roundType: 'Phone Screen', interviewerFocus: 'Micro-partition zone-map binary search.' },
@@ -667,7 +667,7 @@ export const COMPANIES: CompanyProfile[] = [
     interviewBarSummary: 'Ontology graph resolution: topological sort, cycle detection, BFS traversals, and complex state invariants.',
     preferredLanguages: ['Java', 'Python', 'TypeScript'],
     signaturePatterns: ['Trees & Graphs', 'Sliding Window', 'Monotonic Stack', 'Linked List & Pointers'],
-    totalCuratedQuestions: 86,
+    totalCuratedQuestions: 92,
     featuredQuestions: [
       { problemId: 'course-schedule-cycle', frequency: '97%', roundType: 'Onsite Coding', interviewerFocus: 'Ontology transform pipeline lineage & cycle detection.' },
       { problemId: 'binary-tree-level-order', frequency: '91%', roundType: 'Phone Screen', interviewerFocus: 'Entity relationship graph hop-by-hop BFS.' },
@@ -683,7 +683,7 @@ export const COMPANIES: CompanyProfile[] = [
     interviewBarSummary: 'Enterprise Java & Python fundamentals: LRU cache, tree traversals, dynamic programming, and stack-based expression evaluators.',
     preferredLanguages: ['Java', 'Python', 'C++'],
     signaturePatterns: ['Linked List & Pointers', 'Trees & Graphs', 'Dynamic Programming', 'Monotonic Stack'],
-    totalCuratedQuestions: 102,
+    totalCuratedQuestions: 56,
     featuredQuestions: [
       { problemId: 'lru-cache-pointers', frequency: '94%', roundType: 'Onsite Coding', interviewerFocus: 'Multi-tenant metadata cache eviction.' },
       { problemId: 'valid-parentheses-stack', frequency: '91%', roundType: 'Phone Screen', interviewerFocus: 'Formula field syntax delimiter validation.' },
@@ -699,7 +699,7 @@ export const COMPANIES: CompanyProfile[] = [
     interviewBarSummary: 'Document DOM trees, undo/redo linked stacks, two-pointer geometry/array processing, and binary search.',
     preferredLanguages: ['C++', 'Java', 'Python'],
     signaturePatterns: ['Linked List & Pointers', 'Two Pointers', 'Trees & Graphs', 'Dynamic Programming'],
-    totalCuratedQuestions: 99,
+    totalCuratedQuestions: 57,
     featuredQuestions: [
       { problemId: 'reverse-linked-list', frequency: '93%', roundType: 'Phone Screen', interviewerFocus: 'Action history chain pointer reversal.' },
       { problemId: 'container-most-water', frequency: '90%', roundType: 'Phone Screen', interviewerFocus: 'Bounding box area maximization via two pointers.' },
@@ -715,7 +715,7 @@ export const COMPANIES: CompanyProfile[] = [
     interviewBarSummary: 'Networking & packet processing: linked buffer lists, ring-buffer binary search, routing loop detection (Floyd), and graphs.',
     preferredLanguages: ['C++', 'Python', 'Java', 'C'],
     signaturePatterns: ['Linked List & Pointers', 'Trees & Graphs', 'Binary Search', 'Two Pointers'],
-    totalCuratedQuestions: 87,
+    totalCuratedQuestions: 94,
     featuredQuestions: [
       { problemId: 'cycle-detection-floyd', frequency: '95%', roundType: 'Phone Screen', interviewerFocus: 'Routing table next-hop pointer loop detection in O(1) memory.' },
       { problemId: 'reverse-linked-list', frequency: '92%', roundType: 'Phone Screen', interviewerFocus: 'Sk_buff packet descriptor chain reversal.' },
@@ -731,7 +731,7 @@ export const COMPANIES: CompanyProfile[] = [
     interviewBarSummary: 'Core computer science foundations: linked lists, stacks, binary trees, dynamic programming, and two pointers.',
     preferredLanguages: ['Java', 'Python', 'C++'],
     signaturePatterns: ['Linked List & Pointers', 'Dynamic Programming', 'Two Pointers', 'Trees & Graphs'],
-    totalCuratedQuestions: 94,
+    totalCuratedQuestions: 59,
     featuredQuestions: [
       { problemId: 'two-sum-hash', frequency: '94%', roundType: 'Phone Screen', interviewerFocus: 'Hash table indexing and time/space trade-off.' },
       { problemId: 'reverse-linked-list', frequency: '91%', roundType: 'Phone Screen', interviewerFocus: 'Three-pointer iterative reversal trace.' },
@@ -747,7 +747,7 @@ export const COMPANIES: CompanyProfile[] = [
     interviewBarSummary: 'Hardware-conscious software engineering: memory alignment, pointer manipulation, cycle detection, and binary search.',
     preferredLanguages: ['C++', 'Python', 'Java'],
     signaturePatterns: ['Linked List & Pointers', 'Binary Search', 'Two Pointers', 'Trees & Graphs'],
-    totalCuratedQuestions: 76,
+    totalCuratedQuestions: 91,
     featuredQuestions: [
       { problemId: 'reverse-linked-list', frequency: '94%', roundType: 'Phone Screen', interviewerFocus: 'In-place pointer updates and register usage.' },
       { problemId: 'cycle-detection-floyd', frequency: '91%', roundType: 'Onsite Coding', interviewerFocus: 'Fast/slow pointer address convergence.' },
@@ -763,7 +763,7 @@ export const COMPANIES: CompanyProfile[] = [
     interviewBarSummary: 'Systems & compiler optimization focus: instruction DAG scheduling, pointer reversal, LRU cache mechanics, and binary search.',
     preferredLanguages: ['C++', 'Python', 'Java'],
     signaturePatterns: ['Linked List & Pointers', 'Trees & Graphs', 'Binary Search', 'Two Pointers'],
-    totalCuratedQuestions: 72,
+    totalCuratedQuestions: 61,
     featuredQuestions: [
       { problemId: 'course-schedule-cycle', frequency: '93%', roundType: 'Onsite Coding', interviewerFocus: 'Compiler instruction dependency DAG scheduling.' },
       { problemId: 'lru-cache-pointers', frequency: '90%', roundType: 'Onsite Coding', interviewerFocus: 'Set-associative cache LRU doubly-linked list.' },
@@ -779,7 +779,7 @@ export const COMPANIES: CompanyProfile[] = [
     interviewBarSummary: 'Embedded & systems rigor: zero-extra-memory linked list algorithms, circular buffer binary search, and sliding windows.',
     preferredLanguages: ['C++', 'Python', 'Java', 'C'],
     signaturePatterns: ['Linked List & Pointers', 'Two Pointers', 'Binary Search', 'Sliding Window'],
-    totalCuratedQuestions: 81,
+    totalCuratedQuestions: 94,
     featuredQuestions: [
       { problemId: 'cycle-detection-floyd', frequency: '95%', roundType: 'Phone Screen', interviewerFocus: 'DMA descriptor ring cycle detection in O(1) RAM.' },
       { problemId: 'reverse-linked-list', frequency: '92%', roundType: 'Phone Screen', interviewerFocus: 'In-place linked list reversal.' },
@@ -795,7 +795,7 @@ export const COMPANIES: CompanyProfile[] = [
     interviewBarSummary: 'Known for clean, modular data structure design: rate limiters (sliding window), caches (LRU), and issue dependency graphs.',
     preferredLanguages: ['Java', 'Python', 'TypeScript', 'Go'],
     signaturePatterns: ['Sliding Window', 'Linked List & Pointers', 'Trees & Graphs', 'Heap & Priority Queue'],
-    totalCuratedQuestions: 73,
+    totalCuratedQuestions: 55,
     featuredQuestions: [
       { problemId: 'lru-cache-pointers', frequency: '94%', roundType: 'Onsite Coding', interviewerFocus: 'Clean OOP node separation and O(1) eviction.' },
       { problemId: 'course-schedule-cycle', frequency: '91%', roundType: 'Onsite Coding', interviewerFocus: 'Jira issue blocker cycle detection.' },
@@ -811,7 +811,7 @@ export const COMPANIES: CompanyProfile[] = [
     interviewBarSummary: 'High-throughput observability engineering: time-series monotonic stacks, sliding window aggregations, and top-K metric heaps.',
     preferredLanguages: ['Go', 'Python', 'Java', 'Rust'],
     signaturePatterns: ['Sliding Window', 'Monotonic Stack', 'Heap & Priority Queue', 'Trees & Graphs'],
-    totalCuratedQuestions: 68,
+    totalCuratedQuestions: 60,
     featuredQuestions: [
       { problemId: 'daily-temperatures-stack', frequency: '94%', roundType: 'Phone Screen', interviewerFocus: 'Metric spike duration via monotonic stack.' },
       { problemId: 'kth-largest-heap', frequency: '91%', roundType: 'Phone Screen', interviewerFocus: 'Top-K noisy host aggregation with bounded min-heap.' },
@@ -827,7 +827,7 @@ export const COMPANIES: CompanyProfile[] = [
     interviewBarSummary: 'Edge networking & caching: LRU cache eviction, sliding window rate limiting, binary search, and fast cycle detection.',
     preferredLanguages: ['Rust', 'Go', 'Python', 'Java'],
     signaturePatterns: ['Linked List & Pointers', 'Sliding Window', 'Binary Search', 'Two Pointers'],
-    totalCuratedQuestions: 65,
+    totalCuratedQuestions: 60,
     featuredQuestions: [
       { problemId: 'lru-cache-pointers', frequency: '96%', roundType: 'Onsite Coding', interviewerFocus: 'CDN edge asset cache O(1) promotion and eviction.' },
       { problemId: 'longest-substring-unique', frequency: '90%', roundType: 'Phone Screen', interviewerFocus: 'Sliding window request fingerprinting.' },
@@ -843,7 +843,7 @@ export const COMPANIES: CompanyProfile[] = [
     interviewBarSummary: 'Endpoint telemetry & process trees: tree level-order traversal, process DAG cycle detection, and sliding window anomaly scans.',
     preferredLanguages: ['C++', 'Go', 'Python', 'Java'],
     signaturePatterns: ['Trees & Graphs', 'Sliding Window', 'Linked List & Pointers', 'Heap & Priority Queue'],
-    totalCuratedQuestions: 59,
+    totalCuratedQuestions: 58,
     featuredQuestions: [
       { problemId: 'binary-tree-level-order', frequency: '93%', roundType: 'Phone Screen', interviewerFocus: 'Process spawn tree breadth-first inspection.' },
       { problemId: 'course-schedule-cycle', frequency: '90%', roundType: 'Onsite Coding', interviewerFocus: 'Execution dependency graph analysis.' },
@@ -859,7 +859,7 @@ export const COMPANIES: CompanyProfile[] = [
     interviewBarSummary: 'Storage engine (WiredTiger) & query planner algorithms: LRU cache pages, tree traversals, binary search, and two-pointer merges.',
     preferredLanguages: ['C++', 'Java', 'Python', 'Go'],
     signaturePatterns: ['Linked List & Pointers', 'Trees & Graphs', 'Binary Search', 'Two Pointers'],
-    totalCuratedQuestions: 67,
+    totalCuratedQuestions: 58,
     featuredQuestions: [
       { problemId: 'lru-cache-pointers', frequency: '95%', roundType: 'Onsite Coding', interviewerFocus: 'WiredTiger storage page eviction doubly-linked list.' },
       { problemId: 'binary-tree-level-order', frequency: '91%', roundType: 'Phone Screen', interviewerFocus: 'Index tree level traversal.' },
@@ -875,7 +875,7 @@ export const COMPANIES: CompanyProfile[] = [
     interviewBarSummary: 'Scene-graph trees, undo/redo pointer stacks, spatial bounding boxes, and dependency graph evaluation.',
     preferredLanguages: ['TypeScript', 'C++', 'Python', 'Java'],
     signaturePatterns: ['Trees & Graphs', 'Monotonic Stack', 'Linked List & Pointers', 'Two Pointers'],
-    totalCuratedQuestions: 61,
+    totalCuratedQuestions: 64,
     featuredQuestions: [
       { problemId: 'binary-tree-level-order', frequency: '93%', roundType: 'Phone Screen', interviewerFocus: 'Canvas scene-graph layer hierarchy traversal.' },
       { problemId: 'course-schedule-cycle', frequency: '90%', roundType: 'Onsite Coding', interviewerFocus: 'Component instance dependency cycle detection.' },
@@ -891,7 +891,7 @@ export const COMPANIES: CompanyProfile[] = [
     interviewBarSummary: 'Block-tree hierarchy manipulation, formula dependency graphs, LRU block caches, and clean extensible code.',
     preferredLanguages: ['TypeScript', 'Python', 'Java'],
     signaturePatterns: ['Trees & Graphs', 'Linked List & Pointers', 'Monotonic Stack', 'Sliding Window'],
-    totalCuratedQuestions: 55,
+    totalCuratedQuestions: 58,
     featuredQuestions: [
       { problemId: 'binary-tree-level-order', frequency: '94%', roundType: 'Phone Screen', interviewerFocus: 'Nested block tree breadth-first serialization.' },
       { problemId: 'course-schedule-cycle', frequency: '91%', roundType: 'Onsite Coding', interviewerFocus: 'Rollup/formula circular reference detection.' },
@@ -907,7 +907,7 @@ export const COMPANIES: CompanyProfile[] = [
     interviewBarSummary: 'Build pipeline task graphs (Turborepo DAGs), edge cache eviction (LRU), and fast streaming string parsers.',
     preferredLanguages: ['TypeScript', 'Rust', 'Go', 'Python', 'Java'],
     signaturePatterns: ['Trees & Graphs', 'Linked List & Pointers', 'Sliding Window', 'Monotonic Stack'],
-    totalCuratedQuestions: 52,
+    totalCuratedQuestions: 61,
     featuredQuestions: [
       { problemId: 'course-schedule-cycle', frequency: '96%', roundType: 'Onsite Coding', interviewerFocus: 'Monorepo task build graph topological execution & cycle check.' },
       { problemId: 'lru-cache-pointers', frequency: '92%', roundType: 'Onsite Coding', interviewerFocus: 'Remote build artifact cache eviction.' },
@@ -923,7 +923,7 @@ export const COMPANIES: CompanyProfile[] = [
     interviewBarSummary: 'Local-first sync engine primitives: delta linked lists, topological dependency graphs, binary search on sync cursors, and LRU caches.',
     preferredLanguages: ['TypeScript', 'Python', 'Java'],
     signaturePatterns: ['Linked List & Pointers', 'Trees & Graphs', 'Binary Search', 'Two Pointers'],
-    totalCuratedQuestions: 48,
+    totalCuratedQuestions: 57,
     featuredQuestions: [
       { problemId: 'course-schedule-cycle', frequency: '93%', roundType: 'Onsite Coding', interviewerFocus: 'Issue blocking graph cycle detection.' },
       { problemId: 'lru-cache-pointers', frequency: '90%', roundType: 'Onsite Coding', interviewerFocus: 'IndexedDB / in-memory entity hydration LRU.' },
@@ -939,7 +939,7 @@ export const COMPANIES: CompanyProfile[] = [
     interviewBarSummary: 'Employee graph & payroll rule dependency resolution: DAG topological sorts, LRU caches, two pointers, and DP.',
     preferredLanguages: ['Python', 'Java', 'Go', 'TypeScript'],
     signaturePatterns: ['Trees & Graphs', 'Dynamic Programming', 'Linked List & Pointers', 'Two Pointers'],
-    totalCuratedQuestions: 66,
+    totalCuratedQuestions: 67,
     featuredQuestions: [
       { problemId: 'course-schedule-cycle', frequency: '95%', roundType: 'Onsite Coding', interviewerFocus: 'Payroll formula dependency graph evaluation.' },
       { problemId: 'binary-tree-level-order', frequency: '91%', roundType: 'Phone Screen', interviewerFocus: 'Org chart reporting hierarchy BFS.' },
@@ -955,7 +955,7 @@ export const COMPANIES: CompanyProfile[] = [
     interviewBarSummary: 'Nested comment trees, hot-ranking priority queues, rate-limiting sliding windows, and cache eviction.',
     preferredLanguages: ['Python', 'Go', 'Java'],
     signaturePatterns: ['Trees & Graphs', 'Heap & Priority Queue', 'Sliding Window', 'Linked List & Pointers'],
-    totalCuratedQuestions: 63,
+    totalCuratedQuestions: 103,
     featuredQuestions: [
       { problemId: 'binary-tree-level-order', frequency: '94%', roundType: 'Phone Screen', interviewerFocus: 'Comment thread tree level-by-level pagination.' },
       { problemId: 'kth-largest-heap', frequency: '90%', roundType: 'Phone Screen', interviewerFocus: 'Subreddit top-K hot post min-heap.' },

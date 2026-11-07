@@ -261,6 +261,56 @@ const TOPIC_QUESTION_SPECS: Record<CoreTopic, TopicSeedSpec[]> = {
       keyInsight: 'Maintain leftSum in a single register while rightSum = totalSum - leftSum - nums[i] in O(1) space.',
       fnName: 'findEquilibriumPivot',
     },
+    {
+      id: 'container-most-water',
+      title: 'Container With Most Water (Greedy Two-Pointer Contraction)',
+      difficulty: 'Medium',
+      traceFamilyId: 'container-most-water',
+      defaultInput: '1, 8, 6, 2, 5, 4, 8, 3, 7',
+      summary: 'Compute the maximum water bounded by vertical line heights using inward pointer contraction.',
+      keyInsight: 'Always advancing the shorter height line inward is strictly optimal because moving the taller line can only decrease width without height gain.',
+      fnName: 'maxWaterContainer',
+    },
+    {
+      id: 'arr-22-rotateimageinplace',
+      title: 'Rotate Image 90° Clockwise In-Place (Transpose & Reflect)',
+      difficulty: 'Medium',
+      traceFamilyId: 'two-sum-hash',
+      defaultInput: 'matrix=[[1,2,3],[4,5,6],[7,8,9]]',
+      summary: 'Rotate an N x N 2D matrix in-place by 90 degrees clockwise without allocating a secondary buffer.',
+      keyInsight: 'Transposing the matrix along its main diagonal followed by reversing each row achieves an exact 90-degree clockwise rotation in O(1) space.',
+      fnName: 'rotateImageInPlace',
+    },
+    {
+      id: 'arr-23-spiralmatrixtraversal',
+      title: 'Spiral Matrix Boundary Layer Traversal',
+      difficulty: 'Medium',
+      traceFamilyId: 'two-sum-hash',
+      defaultInput: 'matrix=[[1,2,3],[4,5,6],[7,8,9]]',
+      summary: 'Traverse an M x N matrix in clockwise spiral order using shrinking top, right, bottom, and left boundary registers.',
+      keyInsight: 'Contracting boundaries top++, right--, bottom--, left-- after each directional sweep prevents revisiting cells and terminates cleanly.',
+      fnName: 'spiralOrderTraversal',
+    },
+    {
+      id: 'arr-24-setmatrixzeroesinplace',
+      title: 'Set Matrix Zeroes In-Place (First Row & Column Markers)',
+      difficulty: 'Medium',
+      traceFamilyId: 'two-sum-hash',
+      defaultInput: 'matrix=[[1,1,1],[1,0,1],[1,1,1]]',
+      summary: 'If an element in an M x N matrix is 0, set its entire row and column to 0 using O(1) auxiliary space.',
+      keyInsight: 'Using the matrix first row and first column as in-place zero-markers avoids allocating O(M+N) external sets.',
+      fnName: 'setMatrixZeroesInPlace',
+    },
+    {
+      id: 'arr-25-groupanagramshash',
+      title: 'Group Anagrams via Frequency Count Signature',
+      difficulty: 'Medium',
+      traceFamilyId: 'two-sum-hash',
+      defaultInput: 'eat, tea, tan, ate, nat, bat',
+      summary: 'Group strings that are anagrams of each other into sublists using a canonical frequency key.',
+      keyInsight: 'A 26-element character count tuple or sorted character string uniquely identifies an anagram class in O(K) hashing time.',
+      fnName: 'groupAnagramsHash',
+    },
   ],
 
   'Linked Lists': [
@@ -447,6 +497,56 @@ const TOPIC_QUESTION_SPECS: Record<CoreTopic, TopicSeedSpec[]> = {
       keyInsight: 'Keep pre anchored before left and repeatedly splice curr.next immediately after pre for (right - left) iterations.',
       fnName: 'reverseSublistRange',
     },
+    {
+      id: 'll-21-mergetwosortedlists',
+      title: 'Merge Two Sorted Linked Lists via Sentinel Head',
+      difficulty: 'Easy',
+      traceFamilyId: 'reverse-linked-list',
+      defaultInput: '1 -> 2 -> 4 and 1 -> 3 -> 4',
+      summary: 'Splice together the nodes of two sorted lists in non-decreasing order using a dummy pre-head sentinel.',
+      keyInsight: 'A dummy sentinel node eliminates edge cases for initializing the merged list head and allows uniform pointer rewiring.',
+      fnName: 'mergeTwoSortedChains',
+    },
+    {
+      id: 'll-22-swapnodesinpairs',
+      title: 'Swap Adjacent Linked List Nodes in Pairs',
+      difficulty: 'Medium',
+      traceFamilyId: 'reverse-linked-list',
+      defaultInput: '1 -> 2 -> 3 -> 4',
+      summary: 'Swap every two adjacent nodes in a linked list and return its new head without modifying node values.',
+      keyInsight: 'Rewiring prev.next to second, first.next to second.next, and second.next to first swaps pairs in-place in O(1) space.',
+      fnName: 'swapAdjacentPairs',
+    },
+    {
+      id: 'll-23-rotatelistrightk',
+      title: 'Rotate Linked List Right by K Positions',
+      difficulty: 'Medium',
+      traceFamilyId: 'reverse-linked-list',
+      defaultInput: '1 -> 2 -> 3 -> 4 -> 5 | k=2',
+      summary: 'Rotate the list to the right by K places by connecting tail to head in a ring and severing at length - (k % length).',
+      keyInsight: 'Connecting the list into a circular ring and finding the new tail at length - (k % length) makes rotation a simple single pointer severance.',
+      fnName: 'rotateListRightByK',
+    },
+    {
+      id: 'll-24-partitionlistpivot',
+      title: 'Partition Linked List Around Pivot Value X',
+      difficulty: 'Medium',
+      traceFamilyId: 'reverse-linked-list',
+      defaultInput: '1 -> 4 -> 3 -> 2 -> 5 -> 2 | x=3',
+      summary: 'Preserve relative node order while grouping all nodes less than X before nodes greater than or equal to X.',
+      keyInsight: 'Maintaining two dummy sentinels (before_head and after_head) and linking before_tail to after_head.next preserves stability in O(1) space.',
+      fnName: 'partitionListAroundPivot',
+    },
+    {
+      id: 'll-25-copylistrandompointer',
+      title: 'Copy List with Random Pointer (Interleaved Node Weaving)',
+      difficulty: 'Medium',
+      traceFamilyId: 'reverse-linked-list',
+      defaultInput: '7 -> 13 -> 11 -> 10 -> 1 with random ptrs',
+      summary: 'Deep-copy a linked list where each node contains an extra random reference in O(1) auxiliary space.',
+      keyInsight: 'Interleaving cloned nodes directly after original nodes allows setting copy.random = orig.random.next without a hash table.',
+      fnName: 'copyRandomPointerWeaved',
+    },
   ],
 
   'Dynamic Programming': [
@@ -630,6 +730,56 @@ const TOPIC_QUESTION_SPECS: Record<CoreTopic, TopicSeedSpec[]> = {
       summary: 'Find the largest square of 1s by setting dp[c] = 1 + min(top, left, topLeft) for each cell.',
       keyInsight: 'A square of side L at (r,c) requires squares of side L-1 at (r-1,c), (r,c-1), and (r-1,c-1).',
       fnName: 'maximalSquareArea',
+    },
+    {
+      id: 'dp-21-maxsubarraykadane',
+      title: "Maximum Subarray — Kadane's Running Invariant Sum",
+      difficulty: 'Medium',
+      traceFamilyId: 'coin-change-dp',
+      defaultInput: '-2, 1, -3, 4, -1, 2, 1, -5, 4',
+      summary: 'Find the contiguous subarray with the largest sum in O(N) time and O(1) space.',
+      keyInsight: 'At index i, either extend currentSum = max(nums[i], currentSum + nums[i]) or start a new subarray if the running prefix is negative.',
+      fnName: 'maxSubarrayKadane',
+    },
+    {
+      id: 'dp-22-uniquegridpaths',
+      title: 'Unique Paths in Grid (1D In-Place Row DP)',
+      difficulty: 'Medium',
+      traceFamilyId: 'coin-change-dp',
+      defaultInput: 'm=3, n=7',
+      summary: 'Calculate the number of unique paths from the top-left to bottom-right corner of an M x N grid.',
+      keyInsight: 'Because movement is restricted to down and right, dp[c] = dp[c] + dp[c-1] compresses the 2D grid table into a single 1D row buffer.',
+      fnName: 'uniquePathsGrid',
+    },
+    {
+      id: 'dp-23-houserobbercircular',
+      title: 'House Robber II (Circular Street Non-Adjacent Optimization)',
+      difficulty: 'Medium',
+      traceFamilyId: 'coin-change-dp',
+      defaultInput: '2, 3, 2',
+      summary: 'Maximize stolen loot along a circular street where the first and last houses are adjacent neighbors.',
+      keyInsight: 'Running linear House Robber twice—once on [0..n-2] and once on [1..n-1]—breaks the circular dependency cleanly.',
+      fnName: 'houseRobberCircular',
+    },
+    {
+      id: 'dp-24-targetsumsubsetdiff',
+      title: 'Target Sum — Plus/Minus Sign Assignment via Subset Difference',
+      difficulty: 'Medium',
+      traceFamilyId: 'coin-change-dp',
+      defaultInput: 'nums=[1, 1, 1, 1, 1] | target=3',
+      summary: 'Count ways to assign + and - signs to array numbers to reach the target sum.',
+      keyInsight: 'Partitioning into positive subset P and negative subset N reduces the problem to subset sum: sum(P) = (total + target) / 2.',
+      fnName: 'findTargetSumWays',
+    },
+    {
+      id: 'dp-25-maximalbinarysquare',
+      title: 'Maximal Square of 1s in Binary Matrix (Min-Triplet Expansion)',
+      difficulty: 'Medium',
+      traceFamilyId: 'coin-change-dp',
+      defaultInput: 'coins=[1, 2, 3] | amount=4',
+      summary: 'Find the area of the largest square containing only 1s in a 2D binary matrix.',
+      keyInsight: 'dp[r][c] = 1 + min(dp[r-1][c], dp[r][c-1], dp[r-1][c-1]) computes square expansion in O(MN) time with rolling row memory.',
+      fnName: 'maximalBinarySquareArea',
     },
   ],
 
@@ -815,6 +965,56 @@ const TOPIC_QUESTION_SPECS: Record<CoreTopic, TopicSeedSpec[]> = {
       keyInsight: 'Whenever start[i] >= end[j], a meeting has finished and its room is reused without allocating a new room.',
       fnName: 'minMeetingRoomsTimeline',
     },
+    {
+      id: 'grd-21-mergeoverlappingintervals',
+      title: 'Merge Overlapping Intervals (Start-Time Sweep Line)',
+      difficulty: 'Medium',
+      traceFamilyId: 'container-most-water',
+      defaultInput: '[[1,3],[2,6],[8,10],[15,18]]',
+      summary: 'Merge all overlapping intervals into non-overlapping contiguous intervals.',
+      keyInsight: 'Sorting by start time ensures intervals that can merge appear adjacent in iteration order, allowing in-place boundary extension.',
+      fnName: 'mergeIntervalsSweep',
+    },
+    {
+      id: 'grd-22-insertintervalsorted',
+      title: 'Insert Interval into Disjoint Sorted List (Three-Phase Merge)',
+      difficulty: 'Medium',
+      traceFamilyId: 'container-most-water',
+      defaultInput: 'intervals=[[1,3],[6,9]] | new=[2,5]',
+      summary: 'Insert a new interval into a sorted non-overlapping interval list and merge if necessary.',
+      keyInsight: 'Processing before-overlap, during-overlap (min start, max end), and after-overlap in three sequential phases achieves O(N) linear time.',
+      fnName: 'insertIntervalSorted',
+    },
+    {
+      id: 'grd-23-nonoverlappingintervals',
+      title: 'Non-Overlapping Intervals (Earliest Finish Time Greedy Removal)',
+      difficulty: 'Medium',
+      traceFamilyId: 'container-most-water',
+      defaultInput: '[[1,2],[2,3],[3,4],[1,3]]',
+      summary: 'Find the minimum number of intervals to remove to make the remainder non-overlapping.',
+      keyInsight: 'Always keeping the interval with the earlier end time leaves maximal room for subsequent intervals (Interval Scheduling Theorem).',
+      fnName: 'eraseOverlapIntervals',
+    },
+    {
+      id: 'grd-24-gasstationcirculartank',
+      title: 'Gas Station Circular Tour (Tank Deficit Invariant)',
+      difficulty: 'Medium',
+      traceFamilyId: 'container-most-water',
+      defaultInput: 'gas=[1,2,3,4,5], cost=[3,4,5,1,2]',
+      summary: 'Find the unique starting gas station index that completes a full circular tour around the route.',
+      keyInsight: 'If totalGas >= totalCost, a valid start index is guaranteed to exist immediately after the station where currentTank drops lowest.',
+      fnName: 'canCompleteCircuitGas',
+    },
+    {
+      id: 'grd-25-meetingroomspeak',
+      title: 'Meeting Rooms II (Peak Concurrent Rooms via Two-Pointer Sweep)',
+      difficulty: 'Medium',
+      traceFamilyId: 'container-most-water',
+      defaultInput: '0, 30, 5, 10, 15, 20, 25',
+      summary: 'Find the minimum number of conference rooms required for a schedule of meeting intervals.',
+      keyInsight: 'Sorting starts and ends separately and sweeping two pointers tracks the peak number of simultaneous active meetings.',
+      fnName: 'minMeetingRoomsTwoPointers',
+    },
   ],
 
   'Sliding Window': [
@@ -998,6 +1198,56 @@ const TOPIC_QUESTION_SPECS: Record<CoreTopic, TopicSeedSpec[]> = {
       summary: 'Count subarrays with exactly K odd integers by tracking the gap between the K-th odd number and its predecessor.',
       keyInsight: 'Treating odd numbers as 1 and even numbers as 0 reduces the problem to subarray sum equals K.',
       fnName: 'numberOfNiceSubarrays',
+    },
+    {
+      id: 'sw-21-longestuniquesubstr',
+      title: 'Longest Substring Without Repeating Characters (Elastic Window)',
+      difficulty: 'Medium',
+      traceFamilyId: 'longest-substring-unique',
+      defaultInput: 'abcabcbb',
+      summary: 'Find the length of the longest substring with all unique characters using an elastic left/right index window.',
+      keyInsight: 'Storing the last seen position of each character allows jumping the left boundary forward in O(1) time without stepwise retraction.',
+      fnName: 'lengthOfLongestUniqueSubstring',
+    },
+    {
+      id: 'sw-22-minwindowsubstring',
+      title: 'Minimum Window Substring Covering Target Frequency Map',
+      difficulty: 'Hard',
+      traceFamilyId: 'longest-substring-unique',
+      defaultInput: 'ADOBECODEBANC',
+      summary: 'Find the minimum window in string S which contains all characters of string T in O(N) time.',
+      keyInsight: 'Tracking count of formed distinct characters matching target frequencies enables expanding right and contracting left in two monotonic sweeps.',
+      fnName: 'minWindowSubstringCover',
+    },
+    {
+      id: 'sw-23-longestrepeatreplace',
+      title: 'Longest Repeating Character Replacement (Window - MaxFreq <= K)',
+      difficulty: 'Medium',
+      traceFamilyId: 'longest-substring-unique',
+      defaultInput: 'AABABBA',
+      summary: 'Find the longest substring of identical letters achievable by replacing at most K characters.',
+      keyInsight: 'The window is valid whenever (windowLength - maxFreqCharCount) <= k; maintaining maxFreq avoids re-scanning frequencies.',
+      fnName: 'characterReplacementWindow',
+    },
+    {
+      id: 'sw-24-permutationinstring',
+      title: 'Permutation in String (Fixed-Width Anagram Window)',
+      difficulty: 'Medium',
+      traceFamilyId: 'longest-substring-unique',
+      defaultInput: 'eidbaooo',
+      summary: 'Determine if string S2 contains any permutation of string S1 as a contiguous substring.',
+      keyInsight: 'A fixed-size sliding window of length |S1| with delta frequency count updates checks permutations in O(1) amortized steps.',
+      fnName: 'checkInclusionPermutation',
+    },
+    {
+      id: 'sw-25-slidingwindowmaxdeque',
+      title: 'Sliding Window Maximum (Monotonic Decreasing Deque)',
+      difficulty: 'Hard',
+      traceFamilyId: 'longest-substring-unique',
+      defaultInput: 'nums=[1,3,-1,-3,5,3,6,7], k=3',
+      summary: 'Compute the maximum value in every sliding window of size K using a monotonic deque.',
+      keyInsight: 'Maintaining indices in a deque whose values decrease monotonically guarantees deque.first is always the maximum of the current window.',
+      fnName: 'maxSlidingWindowDeque',
     },
   ],
 
@@ -1184,6 +1434,56 @@ const TOPIC_QUESTION_SPECS: Record<CoreTopic, TopicSeedSpec[]> = {
       keyInsight: 'Whenever nums[i] < thirdElement, we have found a valid "1" before "3" and "2".',
       fnName: 'find132Pattern',
     },
+    {
+      id: 'stk-21-validparentheseslifo',
+      title: 'Valid Parentheses Delimiter Matching (LIFO Stack)',
+      difficulty: 'Easy',
+      traceFamilyId: 'valid-parentheses-stack',
+      defaultInput: '{[()]}',
+      summary: 'Determine if the input string has valid matching bracket pairs in the correct closing order.',
+      keyInsight: 'Every closing bracket must match the top element of the LIFO stack; any mismatch or premature stack exhaustion indicates invalidity.',
+      fnName: 'isValidBracketString',
+    },
+    {
+      id: 'stk-22-minstackregister',
+      title: 'Min Stack with O(1) Minimum Element Lookup',
+      difficulty: 'Medium',
+      traceFamilyId: 'valid-parentheses-stack',
+      defaultInput: '{[()]}',
+      summary: 'Design a stack that supports push, pop, top, and retrieving the minimum element in O(1) constant time.',
+      keyInsight: 'Pairing each pushed element with the current running minimum on a secondary stack provides O(1) getMin() without scanning.',
+      fnName: 'minStackWithO1Lookup',
+    },
+    {
+      id: 'stk-23-dailytemperaturesmonotonic',
+      title: 'Daily Temperatures (Monotonic Decreasing Index Stack)',
+      difficulty: 'Medium',
+      traceFamilyId: 'daily-temperatures-stack',
+      defaultInput: '73, 74, 75, 71, 69, 72, 76, 73',
+      summary: 'For each day, calculate the number of days until a warmer temperature occurs using a monotonic stack.',
+      keyInsight: 'Storing indices of un-resolved temperatures in a decreasing stack lets a warmer temperature resolve all lower indices in a single pass.',
+      fnName: 'dailyTemperaturesDays',
+    },
+    {
+      id: 'stk-24-largestrecthistogram',
+      title: 'Largest Rectangle in Histogram (Monotonic Increasing Stack)',
+      difficulty: 'Hard',
+      traceFamilyId: 'daily-temperatures-stack',
+      defaultInput: '2, 1, 5, 6, 2, 3',
+      summary: 'Find the area of the largest rectangle that can be formed within the histogram bar heights.',
+      keyInsight: 'Popping a bar when a shorter bar arrives identifies its maximal left and right boundaries, allowing immediate area computation.',
+      fnName: 'largestRectangleHistogramArea',
+    },
+    {
+      id: 'stk-25-evaluaterpnpostfix',
+      title: 'Evaluate Reverse Polish Notation (Operand Postfix Stack)',
+      difficulty: 'Medium',
+      traceFamilyId: 'valid-parentheses-stack',
+      defaultInput: '2, 1, +, 3, *',
+      summary: 'Evaluate the arithmetic value of an expression in Reverse Polish Notation using an evaluation stack.',
+      keyInsight: 'Push numbers onto stack; upon seeing an operator, pop two operands, apply operator in correct order, and push the result back.',
+      fnName: 'evalRPNExpression',
+    },
   ],
 
   'Trees & Heaps': [
@@ -1368,6 +1668,56 @@ const TOPIC_QUESTION_SPECS: Record<CoreTopic, TopicSeedSpec[]> = {
       summary: 'Repeatedly pop the two most frequent characters from a Max-Heap, append them, and push back decremented counts.',
       keyInsight: 'Interleaving the top two most frequent remaining characters prevents any character from colliding with itself.',
       fnName: 'reorganizeStringHeap',
+    },
+    {
+      id: 'tr-21-validatebstbounds',
+      title: 'Validate Binary Search Tree (Strict Range [min, max] Invariant)',
+      difficulty: 'Medium',
+      traceFamilyId: 'binary-tree-level-order',
+      defaultInput: '2, 1, 3',
+      summary: 'Verify whether a given binary tree satisfies the strict Binary Search Tree node ordering property.',
+      keyInsight: 'Passing valid range boundaries (low, high) recursively ensures every node in a left subtree is strictly less than all ancestor roots.',
+      fnName: 'isValidBinarySearchTree',
+    },
+    {
+      id: 'tr-22-lowestcommonancestortree',
+      title: 'Lowest Common Ancestor in Binary Tree (Postorder Bubbling)',
+      difficulty: 'Medium',
+      traceFamilyId: 'binary-tree-level-order',
+      defaultInput: '3, 5, 1, 6, 2, 0, 8 | p=5, q=1',
+      summary: 'Find the lowest node in a binary tree that has both nodes P and Q as descendants.',
+      keyInsight: 'A node is the LCA if one target is found in its left branch and the other in its right branch, or the node itself is P or Q.',
+      fnName: 'lowestCommonAncestorBinaryTree',
+    },
+    {
+      id: 'tr-23-maxpathsumbinarytree',
+      title: 'Binary Tree Maximum Path Sum (Clamped Postorder Gain)',
+      difficulty: 'Hard',
+      traceFamilyId: 'binary-tree-level-order',
+      defaultInput: '-10, 9, 20, null, null, 15, 7',
+      summary: 'Find the maximum path sum in a binary tree where the path may start and end at any node.',
+      keyInsight: 'Clamping child branch gains to max(0, gain) allows treating each node as a potential path apex while returning single-branch gain upward.',
+      fnName: 'maxPathSumBinaryTree',
+    },
+    {
+      id: 'tr-24-topkfrequentelements',
+      title: 'Top K Frequent Elements (Min-Heap / Bucket Partition)',
+      difficulty: 'Medium',
+      traceFamilyId: 'kth-largest-heap',
+      defaultInput: 'nums=[1,1,1,2,2,3] | k=2',
+      summary: 'Find the K most frequent elements in an integer array in O(N log K) or O(N) bucket sort time.',
+      keyInsight: 'Maintaining a min-heap bounded by size K discards lower frequencies and retains the top K elements in O(N log K) time.',
+      fnName: 'topKFrequentElements',
+    },
+    {
+      id: 'tr-25-findmediandatastream',
+      title: 'Find Median from Data Stream (Dual Max/Min Heap Balance)',
+      difficulty: 'Hard',
+      traceFamilyId: 'kth-largest-heap',
+      defaultInput: 'nums=[3, 2, 1, 5, 6, 4] | k=2',
+      summary: 'Design a data structure that efficiently inserts numbers and computes the running median in O(1) time.',
+      keyInsight: 'Balancing a max-heap for the lower half and a min-heap for the upper half gives the median immediately from their root values.',
+      fnName: 'findMedianDataStream',
     },
   ],
 
@@ -1554,21 +1904,126 @@ const TOPIC_QUESTION_SPECS: Record<CoreTopic, TopicSeedSpec[]> = {
       keyInsight: 'Unioning every email in an account with its first email links all transitive aliases in O(N alpha(N)).',
       fnName: 'accountsMergeUF',
     },
+    {
+      id: 'gr-21-numislandsmulti',
+      title: 'Number of Islands (Multi-Component Matrix Flood Fill BFS/DFS)',
+      difficulty: 'Medium',
+      traceFamilyId: 'course-schedule-cycle',
+      defaultInput: 'V=4 | 0->1, 0->2, 1->3, 2->3',
+      summary: 'Count the number of islands (connected components of 1s) in a 2D binary grid.',
+      keyInsight: 'Triggering a BFS or DFS sink upon encountering an unvisited 1 marks the entire island visited and increments the island count.',
+      fnName: 'numIslandsGrid',
+    },
+    {
+      id: 'gr-22-coursescheduleiiorder',
+      title: "Course Schedule II (Topological Kahn's BFS Course Order)",
+      difficulty: 'Medium',
+      traceFamilyId: 'course-schedule-cycle',
+      defaultInput: 'V=4 | 0->1, 0->2, 1->3, 2->3',
+      summary: 'Return the exact order of courses you should finish to complete all prerequisites, or an empty array if impossible.',
+      keyInsight: 'Recording courses as they are popped from the zero in-degree queue produces a valid topological ordering iff all vertices are visited.',
+      fnName: 'findOrderCourseSchedule',
+    },
+    {
+      id: 'gr-23-rottingorangesmultisource',
+      title: 'Rotting Oranges (Multi-Source Simultaneous BFS Infection Wave)',
+      difficulty: 'Medium',
+      traceFamilyId: 'course-schedule-cycle',
+      defaultInput: 'V=4 | 0->1, 0->2, 1->3, 2->3',
+      summary: 'Determine the minimum number of minutes until no fresh orange remains in a grid.',
+      keyInsight: 'Enqueuing all initially rotten oranges simultaneously runs a multi-source level-by-level BFS, tracking exact elapsed minutes.',
+      fnName: 'orangesRottingMultiSource',
+    },
+    {
+      id: 'gr-24-wordladderbibfs',
+      title: 'Word Ladder (Shortest Transformation via Bidirectional BFS)',
+      difficulty: 'Hard',
+      traceFamilyId: 'course-schedule-cycle',
+      defaultInput: 'V=4 | 0->1, 0->2, 1->3, 2->3',
+      summary: 'Find the length of the shortest transformation sequence from beginWord to endWord using a word dictionary.',
+      keyInsight: 'Alternating BFS expansions from both beginWord and endWord cuts the search frontier branching factor exponentially.',
+      fnName: 'ladderLengthBiBFS',
+    },
+    {
+      id: 'gr-25-mediantwosortedarrays',
+      title: 'Median of Two Sorted Arrays (Logarithmic Partition Bisect)',
+      difficulty: 'Hard',
+      traceFamilyId: 'search-rotated-sorted',
+      defaultInput: 'nums=[4, 5, 6, 7, 0, 1, 2] | target=0',
+      summary: 'Find the median of two sorted arrays of sizes M and N in strictly O(log(min(M, N))) time.',
+      keyInsight: 'Binary searching the partition cut in the smaller array so that left elements <= right elements finds the median in logarithmic steps.',
+      fnName: 'findMedianTwoSortedArrays',
+    },
   ],
 };
 
-const COMPANY_ROTATION = [
-  ['google', 'meta', 'amazon', 'microsoft', 'apple', 'nvidia'],
-  ['openai', 'anthropic', 'citadel', 'jane-street', 'stripe', 'databricks'],
-  ['netflix', 'uber', 'airbnb', 'snowflake', 'cloudflare', 'palantir'],
-  ['two-sigma', 'hrt', 'goldman-sachs', 'morgan-stanley', 'coinbase', 'block'],
-  ['bytedance', 'tesla', 'spacex', 'deepmind', 'waymo', 'scale-ai'],
+const FAANG_COMPANIES = [
+  'google', 'meta', 'amazon', 'apple', 'microsoft', 'netflix', 'nvidia',
+  'bytedance', 'tiktok', 'oracle', 'tesla', 'spacex'
+];
+const AI_COMPANIES = [
+  'openai', 'anthropic', 'deepmind', 'scale-ai', 'waymo', 'perplexity', 'databricks'
+];
+const QUANT_COMPANIES = [
+  'citadel', 'jane-street', 'two-sigma', 'hrt', 'goldman-sachs', 'morgan-stanley', 'jpmorgan'
+];
+const FINTECH_COMPANIES = [
+  'stripe', 'uber', 'airbnb', 'coinbase', 'robinhood', 'block', 'doordash',
+  'instacart', 'lyft', 'spotify', 'snap', 'pinterest', 'linkedin', 'reddit', 'palantir-foundry'
+];
+const ENTERPRISE_COMPANIES = [
+  'snowflake', 'palantir', 'salesforce', 'adobe', 'cisco', 'ibm', 'intel',
+  'amd', 'qualcomm', 'atlassian', 'datadog', 'cloudflare', 'crowdstrike',
+  'mongodb', 'figma', 'notion', 'vercel', 'linear'
 ];
 
+function getCompaniesForProblem(globalNum: number, topic: CoreTopic, problemId: string): string[] {
+  const set = new Set<string>();
+
+  const UNIVERSAL_STAPLES = [
+    'two-sum-hash', 'trapping-rain-water', 'three-sum-zero', 'reverse-linked-list',
+    'lru-cache-pointers', 'valid-parentheses-stack', 'course-schedule-cycle',
+    'binary-tree-level-order', 'longest-substring-unique', 'coin-change-dp',
+    'container-most-water', 'search-rotated-sorted'
+  ];
+  if (UNIVERSAL_STAPLES.includes(problemId)) {
+    FAANG_COMPANIES.forEach((c) => set.add(c));
+    ['stripe', 'uber', 'airbnb', 'citadel', 'openai', 'snowflake', 'doordash', 'linkedin', 'figma', 'bloomberg'].forEach((c) => set.add(c));
+  }
+
+  if (topic === 'Graphs & Search' || topic === 'Trees & Heaps') {
+    ['google', 'meta', 'amazon', 'microsoft', 'uber', 'airbnb', 'openai', 'palantir', 'deepmind', 'waymo', 'databricks'].forEach((c) => set.add(c));
+  } else if (topic === 'Dynamic Programming') {
+    ['google', 'citadel', 'jane-street', 'two-sigma', 'hrt', 'openai', 'anthropic', 'amazon', 'meta', 'bytedance', 'tiktok'].forEach((c) => set.add(c));
+  } else if (topic === 'Linked Lists' || topic === 'Stacks & Queues') {
+    ['amazon', 'microsoft', 'apple', 'google', 'meta', 'oracle', 'cisco', 'intel', 'qualcomm', 'netflix', 'uber'].forEach((c) => set.add(c));
+  } else if (topic === 'Sliding Window' || topic === 'Arrays') {
+    ['meta', 'google', 'amazon', 'apple', 'bytedance', 'tiktok', 'stripe', 'pinterest', 'spotify', 'snap', 'linkedin', 'reddit'].forEach((c) => set.add(c));
+  }
+
+  for (let i = 0; i < 5; i++) {
+    set.add(FAANG_COMPANIES[(globalNum + i * 3) % FAANG_COMPANIES.length]);
+  }
+  for (let i = 0; i < 3; i++) {
+    set.add(AI_COMPANIES[(globalNum + i * 2) % AI_COMPANIES.length]);
+  }
+  for (let i = 0; i < 3; i++) {
+    set.add(QUANT_COMPANIES[(globalNum + i * 4) % QUANT_COMPANIES.length]);
+  }
+  for (let i = 0; i < 5; i++) {
+    set.add(FINTECH_COMPANIES[(globalNum + i * 2) % FINTECH_COMPANIES.length]);
+  }
+  for (let i = 0; i < 5; i++) {
+    set.add(ENTERPRISE_COMPANIES[(globalNum + i * 3) % ENTERPRISE_COMPANIES.length]);
+  }
+
+  return Array.from(set);
+}
+
 /**
- * Generates the complete 160-problem curriculum (8 Topics x 20 Problems each),
+ * Generates the complete 200-problem curriculum (8 Topics x 25 Problems each),
  * merging the rich canonical definitions from BASE_PROBLEMS where IDs match and
- * synthesizing full Python/Java solutions, constraints, and trace metadata for all 160 items.
+ * synthesizing full Python/Java solutions, constraints, and trace metadata for all 200 items.
  */
 export function buildFullTopicCurriculum(baseProblems: AlgorithmProblem[]): AlgorithmProblem[] {
   const baseById = new Map<string, AlgorithmProblem>();
@@ -1599,9 +2054,10 @@ export function buildFullTopicCurriculum(baseProblems: AlgorithmProblem[]): Algo
           topicIndex,
           traceFamilyId: spec.traceFamilyId,
           pattern: topicMeta.id,
+          companies: Array.from(new Set([...existingBase.companies, ...getCompaniesForProblem(globalNumber, topicMeta.id, problemId)])),
         });
       } else {
-        const companyGroup = COMPANY_ROTATION[(globalNumber + idx) % COMPANY_ROTATION.length];
+        const companyGroup = getCompaniesForProblem(globalNumber, topicMeta.id, problemId);
         allProblems.push({
           id: problemId,
           number: globalNumber++,
