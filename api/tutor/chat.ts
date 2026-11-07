@@ -1,8 +1,15 @@
 import { GoogleGenAI } from '@google/genai';
 
 function getGenAIClient(): GoogleGenAI {
+  const apiKey = process.env.GEMINI_API_KEY;
+  if (!apiKey) {
+    throw Object.assign(
+      new Error('GEMINI_API_KEY is not set. Add it to your Vercel Project Environment Variables.'),
+      { status: 503 }
+    );
+  }
   return new GoogleGenAI({
-    apiKey: process.env.GEMINI_API_KEY,
+    apiKey,
     httpOptions: {
       headers: {
         'User-Agent': 'aistudio-build',
@@ -60,8 +67,9 @@ ${recentHistory ? `Recent Conversation:\n${recentHistory}\n\n` : ''}Student Ques
 ${message}`;
 
     const candidateModels = [
-      'gemini-3.8-flash',
+      'gemini-flash-lite-latest',
       'gemini-flash-latest',
+      'gemini-3.8-flash',
       'gemini-3.1-flash-lite',
     ];
     let response: any = null;
@@ -81,7 +89,13 @@ ${message}`;
       } catch (err: any) {
         lastError = err;
         const status = err?.status || err?.code;
-        if (status === 503 || status === 429 || String(err?.message || '').includes('503')) {
+        if (
+          status === 503 ||
+          status === 429 ||
+          status === 404 ||
+          String(err?.message || '').includes('503') ||
+          String(err?.message || '').includes('404')
+        ) {
           continue;
         }
         throw err;
