@@ -36,8 +36,9 @@ async function generateWithFallback(
   params: { contents: string; config?: Record<string, any> }
 ) {
   const candidateModels = [
-    'gemini-3.8-flash',
+    'gemini-flash-lite-latest',
     'gemini-flash-latest',
+    'gemini-3.8-flash',
     'gemini-3.1-flash-lite',
   ];
   let lastError: any = null;
@@ -52,8 +53,14 @@ async function generateWithFallback(
     } catch (err: any) {
       lastError = err;
       const status = err?.status || err?.code;
-      // Retry on 503 Unavailable or 429 Rate Limit
-      if (status === 503 || status === 429 || String(err?.message || '').includes('503')) {
+      // Retry on 503 Unavailable, 429 Rate Limit, or 404 (model deprecated/unsupported for account)
+      if (
+        status === 503 ||
+        status === 429 ||
+        status === 404 ||
+        String(err?.message || '').includes('503') ||
+        String(err?.message || '').includes('404')
+      ) {
         continue;
       }
       throw err;
