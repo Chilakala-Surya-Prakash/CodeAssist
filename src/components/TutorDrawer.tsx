@@ -180,13 +180,13 @@ export const TutorDrawer: React.FC<TutorDrawerProps> = ({
     };
 
     ws.onerror = () => {
-      if (!connectedOnce && autoNarrateCurrentStep) {
+      if (!connectedOnce) {
         runServerlessVoiceFallback();
       }
     };
 
     ws.onclose = () => {
-      if (!connectedOnce && autoNarrateCurrentStep) {
+      if (!connectedOnce) {
         runServerlessVoiceFallback();
         return;
       }

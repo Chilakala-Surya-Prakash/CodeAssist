@@ -179,6 +179,10 @@ ${message}`;
         res.status(400).json({ error: 'Code is required to generate a custom trace.' });
         return;
       }
+      if (code.length > 8000) {
+        res.status(400).json({ error: 'Code too long (max 8000 characters). Paste only the core algorithm.' });
+        return;
+      }
 
       const ai = getGenAIClient();
       const response = await generateWithFallback(ai, {
@@ -250,7 +254,11 @@ Generate between 4 and 8 key execution steps showing how stack variables, heap o
         },
       });
 
-      const rawSteps = JSON.parse((response.text ?? '[]').trim());
+      let textPayload = (response.text ?? '[]').trim();
+      if (textPayload.startsWith('```')) {
+        textPayload = textPayload.replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/, '').trim();
+      }
+      const rawSteps = JSON.parse(textPayload || '[]');
       res.json({ steps: rawSteps });
     } catch (error: any) {
       console.error('Gemini /api/tutor/trace error:', error?.message || error);

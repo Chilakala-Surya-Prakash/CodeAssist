@@ -200,6 +200,229 @@ pub fn reverse_list(head: Option<Box<ListNode>>) -> Option<Box<ListNode>> {
     }
   }
 
+  if (familyId === 'two-sum-hash') {
+    if (language === 'cpp') {
+      return `#include <vector>
+#include <unordered_map>
+using namespace std;
+
+class Solution {
+public:
+    vector<int> twoSum(vector<int>& nums, int target) {
+        unordered_map<int, int> seen;
+        for (int i = 0; i < (int)nums.size(); i++) {
+            int comp = target - nums[i];
+            if (seen.count(comp)) {
+                return {seen[comp], i};
+            }
+            seen[nums[i]] = i;
+        }
+        return {};
+    }
+};`;
+    }
+    if (language === 'go') {
+      return `package main
+
+func twoSum(nums []int, target int) []int {
+    seen := make(map[int]int)
+    for i, num := range nums {
+        comp := target - num
+        if idx, ok := seen[comp]; ok {
+            return []int{idx, i}
+        }
+        seen[num] = i
+    }
+    return nil
+}`;
+    }
+    if (language === 'typescript') {
+      return `export function twoSum(nums: number[], target: number): number[] {
+  const seen = new Map<number, number>();
+  for (let i = 0; i < nums.length; i++) {
+    const comp = target - nums[i];
+    if (seen.has(comp)) {
+      return [seen.get(comp)!, i];
+    }
+    seen.set(nums[i], i);
+  }
+  return [];
+}`;
+    }
+    if (language === 'rust') {
+      return `use std::collections::HashMap;
+
+pub fn two_sum(nums: Vec<i32>, target: i32) -> Vec<i32> {
+    let mut seen = HashMap::new();
+    for (i, &num) in nums.iter().enumerate() {
+        let comp = target - num;
+        if let Some(&prev_idx) = seen.get(&comp) {
+            return vec![prev_idx as i32, i as i32];
+        }
+        seen.insert(num, i);
+    }
+    vec![]
+}`;
+    }
+  }
+
+  if (familyId === 'valid-parentheses-stack') {
+    if (language === 'cpp') {
+      return `#include <string>
+#include <stack>
+#include <unordered_map>
+using namespace std;
+
+class Solution {
+public:
+    bool isValid(string s) {
+        stack<char> st;
+        unordered_map<char, char> matching = {{')', '('}, {'}', '{'}, {']', '['}};
+        for (char ch : s) {
+            if (matching.count(ch)) {
+                if (st.empty() || st.top() != matching[ch]) return false;
+                st.pop();
+            } else {
+                st.push(ch);
+            }
+        }
+        return st.empty();
+    }
+};`;
+    }
+    if (language === 'go') {
+      return `package main
+
+func isValid(s string) bool {
+    st := []rune{}
+    matching := map[rune]rune{')': '(', '}': '{', ']': '['}
+    for _, ch := range s {
+        if open, exists := matching[ch]; exists {
+            if len(st) == 0 || st[len(st)-1] != open {
+                return false
+            }
+            st = st[:len(st)-1]
+        } else {
+            st = append(st, ch)
+        }
+    }
+    return len(st) == 0
+}`;
+    }
+    if (language === 'typescript') {
+      return `export function isValid(s: string): boolean {
+  const stack: string[] = [];
+  const map: Record<string, string> = { ')': '(', '}': '{', ']': '[' };
+  for (const ch of s) {
+    if (map[ch]) {
+      if (stack.pop() !== map[ch]) return false;
+    } else {
+      stack.push(ch);
+    }
+  }
+  return stack.length === 0;
+}`;
+    }
+    if (language === 'rust') {
+      return `pub fn is_valid(s: String) -> bool {
+    let mut stack = Vec::new();
+    for ch in s.chars() {
+        match ch {
+            '(' => stack.push(')'),
+            '{' => stack.push('}'),
+            '[' => stack.push(']'),
+            ')' | '}' | ']' => {
+                if stack.pop() != Some(ch) {
+                    return false;
+                }
+            }
+            _ => {}
+        }
+    }
+    stack.is_empty()
+}`;
+    }
+  }
+
+  if (familyId === 'container-most-water') {
+    if (language === 'cpp') {
+      return `#include <vector>
+#include <algorithm>
+using namespace std;
+
+class Solution {
+public:
+    int maxArea(vector<int>& height) {
+        int left = 0, right = (int)height.size() - 1;
+        int max_water = 0;
+        while (left < right) {
+            int w = right - left;
+            int h = min(height[left], height[right]);
+            max_water = max(max_water, w * h);
+            if (height[left] < height[right]) left++;
+            else right--;
+        }
+        return max_water;
+    }
+};`;
+    }
+    if (language === 'go') {
+      return `package main
+
+func maxArea(height []int) int {
+    left, right := 0, len(height)-1
+    maxWater := 0
+    for left < right {
+        w := right - left
+        h := height[left]
+        if height[right] < h {
+            h = height[right]
+        }
+        if area := w * h; area > maxWater {
+            maxWater = area
+        }
+        if height[left] < height[right] {
+            left++
+        } else {
+            right--
+        }
+    }
+    return maxWater
+}`;
+    }
+    if (language === 'typescript') {
+      return `export function maxArea(height: number[]): number {
+  let left = 0, right = height.length - 1;
+  let maxWater = 0;
+  while (left < right) {
+    const w = right - left;
+    const h = Math.min(height[left], height[right]);
+    maxWater = Math.max(maxWater, w * h);
+    if (height[left] < height[right]) left++;
+    else right--;
+  }
+  return maxWater;
+}`;
+    }
+    if (language === 'rust') {
+      return `pub fn max_area(height: Vec<i32>) -> i32 {
+    let (mut left, mut right) = (0usize, height.len().saturating_sub(1));
+    let mut max_water = 0;
+    while left < right {
+        let w = (right - left) as i32;
+        let h = height[left].min(height[right]);
+        max_water = max_water.max(w * h);
+        if height[left] < height[right] {
+            left += 1;
+        } else {
+            right = right.saturating_sub(1);
+        }
+    }
+    max_water
+}`;
+    }
+  }
+
   // Generic idiomatic adapter for all other problems across C++20, Go, TypeScript, and Rust
   if (language === 'cpp') {
     return `// C++20 Zero-Allocation Pointer & Memory Implementation — ${problem.title}

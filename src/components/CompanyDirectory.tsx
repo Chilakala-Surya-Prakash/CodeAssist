@@ -218,10 +218,10 @@ export const CompanyDirectory: React.FC<CompanyDirectoryProps> = ({
         <div className="flex flex-col md:flex-row md:items-end justify-between gap-4 pb-5 border-b border-neutral-200 dark:border-neutral-800">
           <div>
             <div className="text-xs font-mono text-neutral-500 dark:text-neutral-400">
-              {companies.length} Engineering Organizations · Python &amp; Java Benchmarks
+              {companies.length} Engineering Organizations · Python & Java Benchmarks
             </div>
             <h1 className="text-2xl font-bold tracking-tight text-neutral-950 dark:text-neutral-100 mt-1">
-              Top Tech &amp; Quant Firm Question Directory
+              Top Tech & Quant Firm Question Directory
             </h1>
             <p className="text-sm text-neutral-600 dark:text-neutral-400 mt-1 max-w-2xl">
               Explore standard algorithmic interview questions across {companies.length} top technology, frontier AI, and quantitative trading firms with direct 1-click loading into the step-by-step Memory Visualizer.
@@ -386,7 +386,7 @@ export const CompanyDirectory: React.FC<CompanyDirectoryProps> = ({
                         : 'text-neutral-600 dark:text-neutral-400 hover:text-neutral-950 dark:hover:text-white'
                     }`}
                   >
-                    Bar Raiser &amp; Hard ({barRaiserCount})
+                    Bar Raiser & Hard ({barRaiserCount})
                   </button>
                 </div>
 
@@ -553,7 +553,7 @@ export const CompanyDirectory: React.FC<CompanyDirectoryProps> = ({
             Topic-by-Topic Engineering Curriculum (25 Questions Each)
           </h1>
           <p className="text-sm text-neutral-600 dark:text-neutral-400 mt-1 max-w-2xl">
-            Select a topic below—Arrays, Linked Lists, Dynamic Programming, Greedy, Sliding Window, Stacks &amp; Queues, Trees &amp; Heaps, or Graphs &amp; Search—to practice its 25 sequential problems step by step.
+            Select a topic below—Arrays, Linked Lists, Dynamic Programming, Greedy, Sliding Window, Stacks & Queues, Trees & Heaps, or Graphs & Search—to practice its 25 sequential problems step by step.
           </p>
         </div>
 
@@ -677,7 +677,7 @@ export const CompanyDirectory: React.FC<CompanyDirectoryProps> = ({
               <tr className="border-b border-neutral-200 dark:border-neutral-800 bg-neutral-50 dark:bg-neutral-900/50 text-xs font-mono text-neutral-500">
                 <th className="py-3 px-4 w-12">Done</th>
                 <th className="py-3 px-4 w-24">Code</th>
-                <th className="py-3 px-4">Problem &amp; Memory Invariant</th>
+                <th className="py-3 px-4">Problem & Memory Invariant</th>
                 <th className="py-3 px-4">Topic</th>
                 <th className="py-3 px-4">Difficulty</th>
                 <th className="py-3 px-4 text-right">Step-by-Step Trace</th>

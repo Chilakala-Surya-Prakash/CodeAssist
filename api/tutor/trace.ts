@@ -140,7 +140,11 @@ Generate between 4 and 8 key execution steps showing how stack variables, heap o
       throw lastError;
     }
 
-    const rawSteps = JSON.parse((response.text ?? '[]').trim());
+    let textPayload = (response.text ?? '[]').trim();
+    if (textPayload.startsWith('```')) {
+      textPayload = textPayload.replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/, '').trim();
+    }
+    const rawSteps = JSON.parse(textPayload || '[]');
     res.status(200).json({ steps: rawSteps });
   } catch (error: any) {
     console.error('Vercel /api/tutor/trace error:', error?.message || error);
