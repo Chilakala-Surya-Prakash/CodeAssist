@@ -6,7 +6,7 @@ import {
   LocalTestCaseResult,
   runLocalTestSuite,
 } from '../utils/zeroCostEngines';
-import { Bug, Check, Play, RotateCcw, Sparkles, Terminal, X } from 'lucide-react';
+import { Bug, Check, ChevronLeft, ChevronRight, Play, RotateCcw, Sparkles, Terminal, X } from 'lucide-react';
 
 interface CodeEditorPanelProps {
   problem: AlgorithmProblem;
@@ -21,6 +21,9 @@ interface CodeEditorPanelProps {
   onRunGeminiCustomTrace: () => void;
   isTracingGemini: boolean;
   currentStep: ExecutionStep;
+  stepIndex?: number;
+  totalSteps?: number;
+  onStepCommand?: (action: 'next' | 'prev' | 'reset' | 'goto', stepIndex?: number) => void;
 }
 
 const ALL_LANGUAGES: Language[] = ['python', 'java', 'cpp', 'go', 'typescript', 'rust'];
@@ -38,6 +41,9 @@ export const CodeEditorPanel: React.FC<CodeEditorPanelProps> = ({
   onRunGeminiCustomTrace,
   isTracingGemini,
   currentStep,
+  stepIndex,
+  totalSteps,
+  onStepCommand,
 }) => {
   const [isEditingCode, setIsEditingCode] = useState(false);
   const [breakpoints, setBreakpoints] = useState<Set<number>>(new Set());
@@ -53,6 +59,19 @@ export const CodeEditorPanel: React.FC<CodeEditorPanelProps> = ({
 
   const solutionMeta = language === 'python' ? problem.python : problem.java;
   const bugChallenge = useMemo(() => getBugChallenge(problem), [problem]);
+
+  // Compute inline ghost value (VS Code / Error Lens style) for the active line
+  const inlineGhost = useMemo(() => {
+    const changedVar = currentStep.stackFrames?.[0]?.variables?.find((v) => v.changed);
+    if (changedVar) {
+      return `${changedVar.isPointer ? `*${changedVar.name}` : changedVar.name} = ${changedVar.value}`;
+    }
+    if (currentStep.pointers && currentStep.pointers.length > 0) {
+      const p = currentStep.pointers[0];
+      return p.deltaDescription || `*${p.name} → ${p.targetAddress}`;
+    }
+    return currentStep.memoryMutation?.split('.')[0] || '';
+  }, [currentStep]);
 
   const toggleBreakpoint = (lineNum: number) => {
     setBreakpoints((prev) => {
@@ -96,11 +115,61 @@ export const CodeEditorPanel: React.FC<CodeEditorPanelProps> = ({
   };
 
   return (
-    <div className="flex flex-col rounded-lg border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-[#111111] overflow-hidden">
-      {/* Editor Header Bar */}
-      <div className="flex flex-col gap-2.5 px-4 py-3 border-b border-neutral-200 dark:border-neutral-800 bg-neutral-50 dark:bg-neutral-900/60">
-        {/* 6-Language Switcher (Python, Java, C++20, Go, TypeScript, Rust) */}
-        <div className="flex flex-wrap items-center gap-1 p-0.5 bg-neutral-200/70 dark:bg-neutral-800 rounded-md">
+    <div className="flex flex-col rounded-xl border border-neutral-200/80 dark:border-neutral-800/80 bg-white dark:bg-[#111111] shadow-[0_1px_3px_rgba(0,0,0,0.04)] overflow-hidden">
+      {/* Unified VS Code Floating Debugger Bar docked directly atop code */}
+      {onStepCommand && typeof stepIndex === 'number' && typeof totalSteps === 'number' && (
+        <div className="flex flex-wrap items-center justify-between px-3.5 py-2 bg-neutral-900 text-white dark:bg-[#161B22] border-b border-neutral-800 text-xs font-mono select-none">
+          <div className="flex items-center gap-1.5">
+            <button
+              type="button"
+              onClick={() => onStepCommand('reset')}
+              disabled={stepIndex === 0}
+              title="Reset execution to Line 1 (|<)"
+              className="p-1.5 rounded hover:bg-neutral-800 disabled:opacity-30 transition-colors flex items-center justify-center"
+            >
+              <RotateCcw className="w-3.5 h-3.5 text-neutral-300" />
+            </button>
+            <button
+              type="button"
+              onClick={() => onStepCommand('prev')}
+              disabled={stepIndex === 0}
+              title="Step Back (<)"
+              className="p-1.5 rounded hover:bg-neutral-800 disabled:opacity-30 transition-colors flex items-center justify-center"
+            >
+              <ChevronLeft className="w-4 h-4 text-neutral-300" />
+            </button>
+            <button
+              type="button"
+              onClick={() => onStepCommand('next')}
+              disabled={stepIndex >= totalSteps - 1}
+              title="Step Over / Next Line Execution (▶)"
+              className="flex items-center gap-1.5 px-3 py-1 rounded bg-blue-600 hover:bg-blue-500 text-white font-semibold transition-colors disabled:opacity-30 shadow-xs"
+            >
+              <Play className="w-3.5 h-3.5 fill-current" />
+              <span>Step</span>
+            </button>
+          </div>
+
+          <div className="flex items-center gap-3">
+            <span className="text-[11px] text-neutral-300 tabular-nums">
+              Step <strong className="text-white">{stepIndex + 1}</strong> of {totalSteps} · Line {activeLine}
+            </span>
+            <input
+              type="range"
+              min={0}
+              max={Math.max(0, totalSteps - 1)}
+              value={stepIndex}
+              onChange={(e) => onStepCommand('goto', Number(e.target.value))}
+              className="w-16 sm:w-28 accent-blue-500 cursor-pointer h-1.5"
+            />
+          </div>
+        </div>
+      )}
+
+      {/* Editor Sub-Header: Language Switcher & Modes */}
+      <div className="flex flex-col gap-2.5 px-4 py-2.5 border-b border-neutral-100 dark:border-neutral-800/80 bg-neutral-50/80 dark:bg-neutral-900/60">
+        {/* 6-Language Switcher */}
+        <div className="flex flex-wrap items-center gap-1 p-0.5 bg-neutral-200/60 dark:bg-neutral-800 rounded-md">
           {ALL_LANGUAGES.map((langKey) => (
             <button
               key={langKey}
@@ -166,7 +235,7 @@ export const CodeEditorPanel: React.FC<CodeEditorPanelProps> = ({
         <div className="px-4 py-3 border-b border-neutral-200 dark:border-neutral-800 bg-neutral-100 dark:bg-neutral-900 text-xs space-y-1">
           <div className="font-mono font-semibold text-neutral-950 dark:text-white flex items-center justify-between">
             <span>BUG HUNTER CHALLENGE: {bugChallenge.bugTitle}</span>
-            <span>Line ~{bugChallenge.brokenLineNumber}</span>
+            <span className="tabular-nums">Line ~{bugChallenge.brokenLineNumber}</span>
           </div>
           <p className="text-neutral-700 dark:text-neutral-300">{bugChallenge.symptom}</p>
           <p className="text-neutral-500 dark:text-neutral-400 font-mono text-[11px]">
@@ -175,7 +244,7 @@ export const CodeEditorPanel: React.FC<CodeEditorPanelProps> = ({
         </div>
       )}
 
-      {/* Code Viewport */}
+      {/* Code Viewport with Line-Level Micro-Indicators (Ghost Values) */}
       {isEditingCode ? (
         <div className="p-3 bg-neutral-50 dark:bg-[#0D0D0D]">
           <label htmlFor="source-code-editor" className="sr-only">
@@ -187,7 +256,7 @@ export const CodeEditorPanel: React.FC<CodeEditorPanelProps> = ({
             onChange={(e) => onCodeChange(e.target.value)}
             rows={15}
             spellCheck={false}
-            className="w-full font-mono text-xs leading-6 bg-white dark:bg-neutral-950 text-neutral-900 dark:text-neutral-100 focus:outline-none resize-y p-2.5 rounded border border-neutral-300 dark:border-neutral-800"
+            className="w-full font-mono text-xs leading-6 bg-white dark:bg-neutral-950 text-neutral-900 dark:text-neutral-100 focus:outline-none resize-y p-2.5 rounded-lg border border-neutral-300 dark:border-neutral-800"
           />
           <div className="mt-2 flex flex-wrap items-center justify-between gap-2">
             <span className="text-[11px] font-mono text-neutral-500 dark:text-neutral-400">
@@ -231,17 +300,24 @@ export const CodeEditorPanel: React.FC<CodeEditorPanelProps> = ({
                   onClick={() => toggleBreakpoint(lineNumber)}
                   className={`flex items-center px-3 cursor-pointer select-none transition-colors ${
                     isCurrent
-                      ? 'bg-neutral-900/10 dark:bg-neutral-100/15 text-neutral-950 dark:text-white font-semibold'
+                      ? 'bg-blue-500/10 dark:bg-blue-500/15 text-neutral-950 dark:text-white font-semibold'
                       : 'hover:bg-neutral-100 dark:hover:bg-neutral-900 text-neutral-700 dark:text-neutral-300'
                   }`}
                 >
                   <div className="w-12 shrink-0 flex items-center justify-between pr-3 text-neutral-400 dark:text-neutral-500 tabular-nums">
-                    <span className="w-3 text-[10px] text-neutral-950 dark:text-neutral-100 font-bold">
+                    <span className="w-3 text-[10px] text-blue-600 dark:text-blue-400 font-bold">
                       {isCurrent ? '▶' : hasBp ? '●' : ''}
                     </span>
                     <span>{lineNumber}</span>
                   </div>
                   <pre className="whitespace-pre font-mono">{lineText || ' '}</pre>
+
+                  {/* Line-Level Micro-Indicator: Inline Ghost Value */}
+                  {isCurrent && inlineGhost && (
+                    <span className="ml-4 text-[11px] font-mono font-normal text-blue-600/90 dark:text-blue-400/90 italic truncate shrink-0 select-none bg-blue-50/70 dark:bg-blue-950/40 px-2 py-0.2 rounded border border-blue-200/50 dark:border-blue-800/50 tabular-nums">
+                      // → {inlineGhost}
+                    </span>
+                  )}
                 </div>
               );
             })}
@@ -250,12 +326,12 @@ export const CodeEditorPanel: React.FC<CodeEditorPanelProps> = ({
       )}
 
       {/* Complexity & 16-Case Test Runner Strip */}
-      <div className="px-4 py-2.5 border-t border-neutral-200 dark:border-neutral-800 bg-neutral-50 dark:bg-neutral-900/40 flex flex-wrap items-center justify-between gap-2 text-xs">
+      <div className="px-4 py-2.5 border-t border-neutral-100 dark:border-neutral-800/80 bg-neutral-50/80 dark:bg-neutral-900/40 flex flex-wrap items-center justify-between gap-2 text-xs">
         <div className="flex flex-wrap items-center gap-2 text-neutral-500 dark:text-neutral-400 font-mono">
           <span>
             Time: <strong className="text-neutral-950 dark:text-neutral-200">{solutionMeta.timeComplexity}</strong>
           </span>
-          <span aria-hidden="true">·</span>
+          <span aria-hidden="true" className="text-neutral-300 dark:text-neutral-700">·</span>
           <span>
             Space: <strong className="text-neutral-950 dark:text-neutral-200">{solutionMeta.spaceComplexity}</strong>
           </span>
@@ -263,121 +339,56 @@ export const CodeEditorPanel: React.FC<CodeEditorPanelProps> = ({
         <button
           type="button"
           onClick={handleRunTestSuite}
-          className="px-2.5 py-1 text-xs font-mono font-medium rounded border border-neutral-300 dark:border-neutral-700 bg-white dark:bg-neutral-900 text-neutral-900 dark:text-neutral-100 hover:bg-neutral-100 dark:hover:bg-neutral-800 transition-colors"
+          className="text-xs font-mono font-medium text-blue-600 dark:text-blue-400 hover:underline flex items-center gap-1"
         >
-          Run 16 Hidden Edge Cases
+          <Terminal className="w-3.5 h-3.5" />
+          Run Verification Suite
         </button>
       </div>
 
-      {/* Local 16-Test-Case Suite Results Panel */}
+      {/* Test Suite Results Drawer */}
       {testSuiteResults && (
-        <div className="p-3.5 border-t border-neutral-200 dark:border-neutral-800 bg-neutral-50 dark:bg-neutral-900/80 space-y-2">
-          <div className="flex items-center justify-between text-xs font-mono">
-            <span className="font-semibold text-neutral-950 dark:text-white">
-              Edge-Case Verification Suite ({testSuiteResults.filter((r) => r.passed).length}/{testSuiteResults.length} Passed)
+        <div className="px-4 py-3 border-t border-neutral-200 dark:border-neutral-800 bg-neutral-50 dark:bg-neutral-900/80 space-y-2 text-xs font-mono">
+          <div className="flex items-center justify-between">
+            <span className="font-semibold text-neutral-900 dark:text-neutral-100">
+              Test Suite Verification: {testSuiteResults.filter((r) => r.passed).length}/{testSuiteResults.length} Passed
             </span>
             <button
               type="button"
               onClick={() => setTestSuiteResults(null)}
-              className="text-neutral-500 hover:text-neutral-950 dark:hover:text-white"
+              className="text-neutral-400 hover:text-neutral-900 dark:hover:text-white"
             >
-              Hide
+              <X className="w-3.5 h-3.5" />
             </button>
           </div>
           {autoLoadedFailLabel && (
-            <div className="p-2 rounded border border-neutral-900 dark:border-neutral-100 bg-white dark:bg-neutral-950 text-[11px] font-mono text-neutral-900 dark:text-neutral-100">
-              Auto-Opened Failing Test Case in Memory Visualizer: <strong>{autoLoadedFailLabel}</strong>
+            <div className="p-2 rounded bg-red-50 dark:bg-red-950/40 border border-red-200 dark:border-red-800 text-red-700 dark:text-red-300 text-[11px]">
+              Loaded failing test input into visualizer: {autoLoadedFailLabel}
             </div>
           )}
-          <div className="max-h-60 overflow-y-auto divide-y divide-neutral-200 dark:divide-neutral-800 border border-neutral-200 dark:border-neutral-800 rounded-md bg-white dark:bg-[#111111]">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5 max-h-48 overflow-y-auto">
             {testSuiteResults.map((tc) => (
               <div
                 key={tc.id}
-                className="p-2.5 flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-xs font-mono"
+                onClick={() => {
+                  onCustomInputChange(tc.input);
+                  onRunTrace();
+                }}
+                className={`p-2 rounded border cursor-pointer transition-colors flex items-center justify-between ${
+                  tc.passed
+                    ? 'border-emerald-200 dark:border-emerald-900 bg-emerald-50/50 dark:bg-emerald-950/20 text-emerald-800 dark:text-emerald-300'
+                    : 'border-red-200 dark:border-red-900 bg-red-50/50 dark:bg-red-950/20 text-red-800 dark:text-red-300'
+                }`}
               >
-                <div className="space-y-0.5 min-w-0">
-                  <div className="flex flex-wrap items-center gap-1.5">
-                    {tc.passed ? (
-                      <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded bg-neutral-900 text-white dark:bg-neutral-100 dark:text-neutral-950 text-[10px] font-bold">
-                        <Check className="w-3 h-3" /> PASS
-                      </span>
-                    ) : (
-                      <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded border border-neutral-900 dark:border-neutral-100 text-neutral-950 dark:text-white text-[10px] font-bold">
-                        <X className="w-3 h-3" /> FAIL
-                      </span>
-                    )}
-                    <span className="px-1.5 py-0.5 rounded bg-neutral-100 dark:bg-neutral-800 text-[10px] text-neutral-600 dark:text-neutral-400">
-                      {tc.category}
-                    </span>
-                    <span className="font-semibold text-neutral-900 dark:text-neutral-100 truncate">
-                      {tc.label}
-                    </span>
-                    <span className="text-neutral-400">({tc.stepsCount} steps · {tc.peakHeapBytes}B)</span>
-                  </div>
-                  <div className="text-[11px] text-neutral-500 dark:text-neutral-400 truncate">
-                    Input: {tc.input} → {tc.actualOutput}
-                  </div>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => onCustomInputChange(tc.input)}
-                  className="px-2 py-1 text-[11px] rounded border border-neutral-300 dark:border-neutral-700 hover:bg-neutral-100 dark:hover:bg-neutral-800 text-neutral-800 dark:text-neutral-200 shrink-0"
-                >
-                  Load in Visualizer
-                </button>
+                <span className="truncate">{tc.label}</span>
+                <span className="tabular-nums font-semibold shrink-0 ml-1">
+                  {tc.passed ? 'PASS' : 'FAIL'}
+                </span>
               </div>
             ))}
           </div>
         </div>
       )}
-
-      {/* Live Custom Input & Sample Presets Bar */}
-      <div className="p-4 border-t border-neutral-200 dark:border-neutral-800 bg-white dark:bg-[#111111] space-y-3">
-        <div className="flex flex-wrap items-center justify-between gap-2">
-          <label
-            htmlFor="custom-test-input"
-            className="text-xs font-semibold text-neutral-800 dark:text-neutral-200 flex items-center gap-1.5"
-          >
-            <Terminal className="w-3.5 h-3.5 text-neutral-600 dark:text-neutral-400" />
-            Test Case Input
-          </label>
-          <div className="flex flex-wrap items-center gap-1.5">
-            {problem.sampleInputs.map((sample) => (
-              <button
-                key={sample.label}
-                type="button"
-                onClick={() => onCustomInputChange(sample.value)}
-                className={`px-2 py-0.5 text-[11px] font-mono rounded border transition-colors whitespace-nowrap shrink-0 ${
-                  customInput === sample.value
-                    ? 'border-neutral-900 bg-neutral-900 text-white dark:border-neutral-100 dark:bg-neutral-100 dark:text-neutral-950 font-medium'
-                    : 'border-neutral-300 dark:border-neutral-700 text-neutral-600 dark:text-neutral-400 hover:border-neutral-500'
-                }`}
-              >
-                {sample.label}
-              </button>
-            ))}
-          </div>
-        </div>
-
-        <div className="flex items-center gap-2">
-          <input
-            id="custom-test-input"
-            type="text"
-            value={customInput}
-            onChange={(e) => onCustomInputChange(e.target.value)}
-            placeholder="Enter custom array, linked list, or target..."
-            className="flex-1 px-3 py-1.5 text-xs font-mono rounded-md border border-neutral-300 dark:border-neutral-700 bg-neutral-50 dark:bg-neutral-900 text-neutral-900 dark:text-neutral-100 focus:outline-none focus:border-neutral-900 dark:focus:border-neutral-300"
-          />
-          <button
-            type="button"
-            onClick={onRunTrace}
-            className="flex items-center gap-1.5 px-3.5 py-1.5 text-xs font-medium bg-neutral-900 hover:bg-neutral-800 dark:bg-neutral-100 dark:hover:bg-white text-white dark:text-neutral-950 rounded-md transition-colors whitespace-nowrap shrink-0"
-          >
-            <Play className="w-3.5 h-3.5" />
-            Load Input (Line 1)
-          </button>
-        </div>
-      </div>
     </div>
   );
 };

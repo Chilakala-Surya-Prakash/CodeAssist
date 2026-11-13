@@ -25,6 +25,18 @@ export default defineConfig(() => {
             if (id.includes('node_modules/lucide-react')) {
               return 'vendor-icons';
             }
+            if (id.includes('src/utils/traceEngine')) {
+              return 'engine-trace';
+            }
+            if (id.includes('src/utils/zeroCostEngines')) {
+              return 'engine-zero';
+            }
+            if (id.includes('src/data/topicCurriculum')) {
+              return 'data-curriculum';
+            }
+            if (id.includes('src/data/companies')) {
+              return 'data-companies';
+            }
           },
         },
       },

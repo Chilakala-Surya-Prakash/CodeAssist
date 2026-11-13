@@ -3,6 +3,10 @@
   "buildCommand": "npm run build",
   "outputDirectory": "dist",
   "framework": "vite",
+  "functions": {
+    "api/tutor/trace.ts": { "maxDuration": 30 },
+    "api/tutor/chat.ts": { "maxDuration": 20 }
+  },
   "rewrites": [
     {
       "source": "/api/(.*)",

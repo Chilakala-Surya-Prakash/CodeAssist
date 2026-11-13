@@ -144,6 +144,18 @@ export function computeStepSoundProfile(
 
 let sharedAudioCtx: AudioContext | null = null;
 
+export function suspendSharedAudioContext(): void {
+  if (sharedAudioCtx && sharedAudioCtx.state === 'running') {
+    sharedAudioCtx.suspend().catch(() => {});
+  }
+}
+
+export function resumeSharedAudioContext(): void {
+  if (sharedAudioCtx && sharedAudioCtx.state === 'suspended') {
+    sharedAudioCtx.resume().catch(() => {});
+  }
+}
+
 function getAudioContext(): AudioContext | null {
   if (typeof window === 'undefined') return null;
   const AudioCtx = window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;

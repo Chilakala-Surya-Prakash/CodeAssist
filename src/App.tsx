@@ -28,6 +28,8 @@ import {
   DspAudioConfig,
   FilterMode,
   OscillatorWaveform,
+  resumeSharedAudioContext,
+  suspendSharedAudioContext,
   triggerStepSonification,
 } from './utils/soundEngine';
 import { MemoryCanvas } from './components/MemoryCanvas';
@@ -117,7 +119,10 @@ export default function App() {
   const [solvedProblemIds, setSolvedProblemIds] = useState<Set<string>>(() => {
     try {
       const saved = window.localStorage.getItem('tracecraft-solved');
-      if (saved) return new Set(JSON.parse(saved));
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed)) return new Set(parsed);
+      }
     } catch {
       // ignore
     }
@@ -127,7 +132,10 @@ export default function App() {
   const [srSchedule, setSrSchedule] = useState<Record<string, SpacedRepetitionItem>>(() => {
     try {
       const saved = window.localStorage.getItem('tracecraft-sr-schedule');
-      if (saved) return JSON.parse(saved);
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) return parsed;
+      }
     } catch {
       // ignore
     }
@@ -137,7 +145,10 @@ export default function App() {
   const [bookmarks, setBookmarks] = useState<StepBookmark[]>(() => {
     try {
       const saved = window.localStorage.getItem('tracecraft-step-bookmarks');
-      if (saved) return JSON.parse(saved);
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed)) return parsed;
+      }
     } catch {
       // ignore
     }
@@ -161,12 +172,30 @@ export default function App() {
   });
   const [copiedPermalink, setCopiedPermalink] = useState<boolean>(false);
 
-  // Timed 45-Min Mock Interview Simulator State
-  const [mockActive, setMockActive] = useState<boolean>(false);
+  // Timed 45-Min Mock Interview Simulator State (Persisted across tab reloads)
+  const [mockActive, setMockActive] = useState<boolean>(() => {
+    try {
+      return sessionStorage.getItem('tracecraft-mock-active') === 'true';
+    } catch {
+      return false;
+    }
+  });
   const [mockBlindMode, setMockBlindMode] = useState<boolean>(false);
   const [mockCompany, setMockCompany] = useState<string>('Google');
-  const [mockSecondsLeft, setMockSecondsLeft] = useState<number>(45 * 60);
-  const [mockApproachNotes, setMockApproachNotes] = useState<string>('');
+  const [mockSecondsLeft, setMockSecondsLeft] = useState<number>(() => {
+    try {
+      const saved = sessionStorage.getItem('tracecraft-mock-seconds');
+      if (saved) return Number(saved);
+    } catch {}
+    return 45 * 60;
+  });
+  const [mockApproachNotes, setMockApproachNotes] = useState<string>(() => {
+    try {
+      const saved = sessionStorage.getItem('tracecraft-mock-notes');
+      if (saved) return saved;
+    } catch {}
+    return '';
+  });
   const [mockScorecard, setMockScorecard] = useState<MockRubricScorecard | null>(null);
 
   // Interactive System Design & OS Concurrency Visualizer State
@@ -202,6 +231,29 @@ export default function App() {
       return () => mediaQuery.removeEventListener('change', applyTheme);
     }
   }, [themeMode]);
+
+  // Suspend/resume Web Audio DSP when browser tab is hidden to save battery & CPU
+  useEffect(() => {
+    if (!dspConfig.enabled) return;
+    const handleVisibility = () => {
+      if (document.hidden) {
+        suspendSharedAudioContext();
+      } else {
+        resumeSharedAudioContext();
+      }
+    };
+    document.addEventListener('visibilitychange', handleVisibility);
+    return () => document.removeEventListener('visibilitychange', handleVisibility);
+  }, [dspConfig.enabled]);
+
+  // Persist mock interview state to sessionStorage across page reloads
+  useEffect(() => {
+    try {
+      sessionStorage.setItem('tracecraft-mock-active', String(mockActive));
+      sessionStorage.setItem('tracecraft-mock-seconds', String(mockSecondsLeft));
+      sessionStorage.setItem('tracecraft-mock-notes', mockApproachNotes);
+    } catch {}
+  }, [mockActive, mockSecondsLeft, mockApproachNotes]);
 
   // Persist solved problems, spaced repetition & bookmarks in localStorage ($0 cloud-free persistence)
   useEffect(() => {
@@ -617,154 +669,159 @@ export default function App() {
       {/* Main Content Container */}
       <main className="flex-1 max-w-[1440px] w-full mx-auto px-4 sm:px-6 py-6 overflow-x-hidden">
         {activeTab === 'visualizer' && (
-          <div className="space-y-5" data-testid="visualizer-studio-view">
-            {/* Clean 2-Row Topic & Question Navigator */}
-            <div className="rounded-lg border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-[#111111] p-4 space-y-3.5">
-              {/* Row 1: 8 Core Topics Selector (25 Questions Each) */}
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-3 border-b border-neutral-200 dark:border-neutral-800">
-                <span className="text-xs font-mono text-neutral-500 dark:text-neutral-400 shrink-0">
-                  1. Select Topic (25 Questions Each):
+          <div className="space-y-4" data-testid="visualizer-studio-view">
+            {/* Sleek Breadcrumb & Command Bar (Saves ~120px vertical space above the fold) */}
+            <div className="rounded-xl border border-neutral-200/80 dark:border-neutral-800/80 bg-white dark:bg-[#111111] px-4 py-2.5 shadow-[0_1px_3px_rgba(0,0,0,0.04)] flex flex-wrap items-center justify-between gap-3">
+              {/* Left Breadcrumb: Topic Dropdown / Question Dropdown */}
+              <div className="flex flex-wrap items-center gap-2 min-w-0">
+                <span className="text-xs font-mono text-neutral-400 dark:text-neutral-500 uppercase tracking-wider">
+                  Curriculum
                 </span>
-                <div className="flex flex-wrap items-center gap-1.5">
-                  {CORE_TOPICS.map((tMeta) => {
-                    const isCurrentTopic = activeTopic === tMeta.id;
-                    return (
-                      <button
-                        key={tMeta.id}
-                        type="button"
-                        onClick={() => handleSelectTopicInVisualizer(tMeta.id)}
-                        className={`px-2.5 py-1 text-xs font-medium rounded-md border transition-colors whitespace-nowrap shrink-0 ${
-                          isCurrentTopic
-                            ? 'border-neutral-900 bg-neutral-900 text-white dark:border-neutral-100 dark:bg-neutral-100 dark:text-neutral-950 font-semibold'
-                            : 'border-neutral-200 dark:border-neutral-800 text-neutral-600 dark:text-neutral-400 hover:border-neutral-400 dark:hover:border-neutral-600'
-                        }`}
-                      >
-                        {tMeta.id} (20)
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
+                <span className="text-neutral-300 dark:text-neutral-700">/</span>
 
-              {/* Row 2: 20-Question Selector Within Active Topic + Clean Workspace Utilities */}
-              <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3">
-                <div className="flex flex-col sm:flex-row sm:items-center gap-2.5 min-w-0 flex-1">
-                  <label
-                    htmlFor="problem-select"
-                    className="text-xs font-mono text-neutral-500 dark:text-neutral-400 shrink-0"
+                {/* Topic Selector Dropdown */}
+                <div className="relative inline-flex items-center">
+                  <select
+                    value={activeTopic}
+                    onChange={(e) => handleSelectTopicInVisualizer(e.target.value as CoreTopic)}
+                    aria-label="Select Topic"
+                    className="appearance-none bg-neutral-100 hover:bg-neutral-200/80 dark:bg-neutral-900 dark:hover:bg-neutral-800 text-neutral-950 dark:text-neutral-100 text-xs font-semibold px-2.5 py-1.5 pr-6 rounded-md border border-neutral-300/80 dark:border-neutral-700/80 cursor-pointer focus:outline-none transition-colors"
                   >
-                    2. Question ({ currentProblem.topicIndex || 1 }/20):
-                  </label>
+                    {CORE_TOPICS.map((tMeta) => (
+                      <option key={tMeta.id} value={tMeta.id}>
+                        {tMeta.label} (25)
+                      </option>
+                    ))}
+                  </select>
+                  <span className="pointer-events-none absolute right-2 text-[10px] text-neutral-400">▾</span>
+                </div>
+
+                <span className="text-neutral-300 dark:text-neutral-700">/</span>
+
+                {/* Question Selector Dropdown */}
+                <div className="relative inline-flex items-center min-w-0">
                   <select
                     id="problem-select"
                     value={currentProblem.id}
                     onChange={(e) => handleSelectProblem(e.target.value)}
-                    className="w-full sm:max-w-xl text-sm font-semibold bg-neutral-50 dark:bg-neutral-900 text-neutral-950 dark:text-neutral-100 border border-neutral-300 dark:border-neutral-800 rounded-md px-3 py-1.5 truncate focus:outline-none focus:border-neutral-900 dark:focus:border-neutral-300"
+                    aria-label="Select Question"
+                    className="appearance-none bg-neutral-100 hover:bg-neutral-200/80 dark:bg-neutral-900 dark:hover:bg-neutral-800 text-neutral-950 dark:text-neutral-100 text-xs font-bold px-2.5 py-1.5 pr-6 rounded-md border border-neutral-300/80 dark:border-neutral-700/80 cursor-pointer focus:outline-none max-w-xs sm:max-w-md truncate transition-colors"
                   >
                     {topicProblems.map((p) => (
                       <option key={p.id} value={p.id}>
-                        [{p.topicCode || `Q-${p.number}`}] {p.title} ({p.difficulty})
+                        [{p.topicCode || `Q-${p.number}`}] {p.title}
                       </option>
                     ))}
                   </select>
+                  <span className="pointer-events-none absolute right-2 text-[10px] text-neutral-400">▾</span>
                 </div>
 
-                {/* Essential Workspace Utilities + Theme Switcher */}
-                <div className="flex flex-wrap items-center gap-2">
+                {/* Difficulty Badge */}
+                <span
+                  className={`px-2 py-0.5 rounded text-[10px] font-mono font-bold uppercase tracking-wider ${
+                    currentProblem.difficulty === 'Easy'
+                      ? 'bg-emerald-50 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-400 border border-emerald-300/60 dark:border-emerald-800/60'
+                      : currentProblem.difficulty === 'Medium'
+                      ? 'bg-amber-50 text-amber-700 dark:bg-amber-950/60 dark:text-amber-400 border border-amber-300/60 dark:border-amber-800/60'
+                      : 'bg-red-50 text-red-700 dark:bg-red-950/60 dark:text-red-400 border border-red-300/60 dark:border-red-800/60'
+                  }`}
+                >
+                  {currentProblem.difficulty}
+                </span>
+              </div>
+
+              {/* Right Action Utilities (Solved, Notes, DSP, Share, Theme) */}
+              <div className="flex flex-wrap items-center gap-1.5">
+                <button
+                  type="button"
+                  onClick={() => handleToggleSolved(currentProblem.id)}
+                  className={`px-2.5 py-1.5 text-xs font-medium rounded-md border transition-colors flex items-center gap-1.5 whitespace-nowrap shrink-0 ${
+                    solvedProblemIds.has(currentProblem.id)
+                      ? 'border-neutral-900 bg-neutral-900 text-white dark:border-neutral-100 dark:bg-neutral-100 dark:text-neutral-950'
+                      : 'border-neutral-300 dark:border-neutral-800 bg-white dark:bg-[#111111] text-neutral-700 dark:text-neutral-300 hover:border-neutral-500'
+                  }`}
+                >
+                  <Check className="w-3.5 h-3.5" />
+                  {solvedProblemIds.has(currentProblem.id) ? 'Solved' : 'Mark Solved'}
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setShowBookmarksPanel((v) => !v)}
+                  className={`px-2.5 py-1.5 text-xs font-medium rounded-md border transition-colors flex items-center gap-1.5 whitespace-nowrap shrink-0 ${
+                    showBookmarksPanel
+                      ? 'border-neutral-900 bg-neutral-900 text-white dark:border-neutral-100 dark:bg-neutral-100 dark:text-neutral-950'
+                      : 'border-neutral-300 dark:border-neutral-800 bg-white dark:bg-[#111111] text-neutral-800 dark:text-neutral-200 hover:bg-neutral-100 dark:hover:bg-neutral-900'
+                  }`}
+                >
+                  <Bookmark className="w-3.5 h-3.5" />
+                  Notes ({bookmarks.length})
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setShowDspConsole((v) => !v)}
+                  className={`px-2.5 py-1.5 text-xs font-medium rounded-md border transition-colors flex items-center gap-1.5 whitespace-nowrap shrink-0 ${
+                    showDspConsole || dspConfig.enabled
+                      ? 'border-neutral-900 bg-neutral-900 text-white dark:border-neutral-100 dark:bg-neutral-100 dark:text-neutral-950'
+                      : 'border-neutral-300 dark:border-neutral-800 bg-white dark:bg-[#111111] text-neutral-800 dark:text-neutral-200 hover:bg-neutral-100 dark:hover:bg-neutral-900'
+                  }`}
+                >
+                  <Sliders className="w-3.5 h-3.5" />
+                  {dspConfig.enabled ? 'Audio ON' : 'Audio'}
+                </button>
+
+                <button
+                  type="button"
+                  onClick={handleSharePermalink}
+                  className="px-2.5 py-1.5 text-xs font-medium rounded-md border border-neutral-300 dark:border-neutral-800 bg-white dark:bg-[#111111] text-neutral-800 dark:text-neutral-200 hover:bg-neutral-100 dark:hover:bg-neutral-900 transition-colors flex items-center gap-1.5 whitespace-nowrap shrink-0"
+                >
+                  <Share2 className="w-3.5 h-3.5" />
+                  {copiedPermalink ? 'Copied!' : 'Share'}
+                </button>
+
+                {/* Theme Selector */}
+                <div
+                  role="group"
+                  aria-label="Theme preference"
+                  className="inline-flex items-center p-0.5 rounded-md border border-neutral-300 dark:border-neutral-800 bg-neutral-100 dark:bg-neutral-900"
+                >
                   <button
                     type="button"
-                    onClick={() => handleToggleSolved(currentProblem.id)}
-                    className={`px-2.5 py-1.5 text-xs font-medium rounded-md border transition-colors flex items-center gap-1.5 whitespace-nowrap shrink-0 ${
-                      solvedProblemIds.has(currentProblem.id)
-                        ? 'border-neutral-900 bg-neutral-900 text-white dark:border-neutral-100 dark:bg-neutral-100 dark:text-neutral-950'
-                        : 'border-neutral-300 dark:border-neutral-800 bg-white dark:bg-[#111111] text-neutral-700 dark:text-neutral-300 hover:border-neutral-500'
+                    onClick={() => setThemeMode('system')}
+                    aria-label="System theme"
+                    className={`px-1.5 py-1 text-xs rounded transition-colors ${
+                      themeMode === 'system'
+                        ? 'bg-white dark:bg-neutral-800 text-neutral-950 dark:text-white shadow-2xs'
+                        : 'text-neutral-500 hover:text-neutral-950 dark:hover:text-white'
                     }`}
                   >
-                    <Check className="w-3.5 h-3.5" />
-                    {solvedProblemIds.has(currentProblem.id) ? 'Solved' : 'Mark Solved'}
+                    <Monitor className="w-3.5 h-3.5" />
                   </button>
-
                   <button
                     type="button"
-                    onClick={() => setShowBookmarksPanel((v) => !v)}
-                    className={`px-2.5 py-1.5 text-xs font-medium rounded-md border transition-colors flex items-center gap-1.5 whitespace-nowrap shrink-0 ${
-                      showBookmarksPanel
-                        ? 'border-neutral-900 bg-neutral-900 text-white dark:border-neutral-100 dark:bg-neutral-100 dark:text-neutral-950'
-                        : 'border-neutral-300 dark:border-neutral-800 bg-white dark:bg-[#111111] text-neutral-800 dark:text-neutral-200 hover:bg-neutral-100 dark:hover:bg-neutral-900'
+                    onClick={() => setThemeMode('light')}
+                    aria-label="Light theme"
+                    className={`px-1.5 py-1 text-xs rounded transition-colors ${
+                      themeMode === 'light'
+                        ? 'bg-white dark:bg-neutral-800 text-neutral-950 dark:text-white shadow-2xs'
+                        : 'text-neutral-500 hover:text-neutral-950 dark:hover:text-white'
                     }`}
                   >
-                    <Bookmark className="w-3.5 h-3.5" />
-                    Notes ({bookmarks.length})
+                    <Sun className="w-3.5 h-3.5" />
                   </button>
-
                   <button
                     type="button"
-                    onClick={() => setShowDspConsole((v) => !v)}
-                    className={`px-2.5 py-1.5 text-xs font-medium rounded-md border transition-colors flex items-center gap-1.5 whitespace-nowrap shrink-0 ${
-                      showDspConsole || dspConfig.enabled
-                        ? 'border-neutral-900 bg-neutral-900 text-white dark:border-neutral-100 dark:bg-neutral-100 dark:text-neutral-950'
-                        : 'border-neutral-300 dark:border-neutral-800 bg-white dark:bg-[#111111] text-neutral-800 dark:text-neutral-200 hover:bg-neutral-100 dark:hover:bg-neutral-900'
+                    onClick={() => setThemeMode('dark')}
+                    aria-label="Dark theme"
+                    className={`px-1.5 py-1 text-xs rounded transition-colors ${
+                      themeMode === 'dark'
+                        ? 'bg-white dark:bg-neutral-800 text-neutral-950 dark:text-white shadow-2xs'
+                        : 'text-neutral-500 hover:text-neutral-950 dark:hover:text-white'
                     }`}
                   >
-                    <Sliders className="w-3.5 h-3.5" />
-                    {dspConfig.enabled ? 'DSP Audio: ON' : 'Sound Lab'}
+                    <Moon className="w-3.5 h-3.5" />
                   </button>
-
-                  <button
-                    type="button"
-                    onClick={handleSharePermalink}
-                    className="px-2.5 py-1.5 text-xs font-medium rounded-md border border-neutral-300 dark:border-neutral-800 bg-white dark:bg-[#111111] text-neutral-800 dark:text-neutral-200 hover:bg-neutral-100 dark:hover:bg-neutral-900 transition-colors flex items-center gap-1.5 whitespace-nowrap shrink-0"
-                  >
-                    <Share2 className="w-3.5 h-3.5" />
-                    {copiedPermalink ? 'Copied Link!' : 'Share'}
-                  </button>
-
-                  {/* System / Light / Dark Theme Segmented Control */}
-                  <div
-                    role="group"
-                    aria-label="Theme preference"
-                    className="inline-flex items-center p-0.5 rounded-md border border-neutral-300 dark:border-neutral-800 bg-neutral-100 dark:bg-neutral-900"
-                  >
-                    <button
-                      type="button"
-                      onClick={() => setThemeMode('system')}
-                      aria-label="System theme"
-                      title="System theme"
-                      className={`px-2 py-1 text-xs font-medium rounded transition-colors flex items-center gap-1 ${
-                        themeMode === 'system'
-                          ? 'bg-white dark:bg-neutral-800 text-neutral-950 dark:text-white shadow-2xs'
-                          : 'text-neutral-600 dark:text-neutral-400 hover:text-neutral-950 dark:hover:text-white'
-                      }`}
-                    >
-                      <Monitor className="w-3.5 h-3.5" />
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setThemeMode('light')}
-                      aria-label="Light theme"
-                      title="Light theme"
-                      className={`px-2 py-1 text-xs font-medium rounded transition-colors flex items-center gap-1 ${
-                        themeMode === 'light'
-                          ? 'bg-white dark:bg-neutral-800 text-neutral-950 dark:text-white shadow-2xs'
-                          : 'text-neutral-600 dark:text-neutral-400 hover:text-neutral-950 dark:hover:text-white'
-                      }`}
-                    >
-                      <Sun className="w-3.5 h-3.5" />
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setThemeMode('dark')}
-                      aria-label="Dark theme"
-                      title="Dark theme"
-                      className={`px-2 py-1 text-xs font-medium rounded transition-colors flex items-center gap-1 ${
-                        themeMode === 'dark'
-                          ? 'bg-white dark:bg-neutral-800 text-neutral-950 dark:text-white shadow-2xs'
-                          : 'text-neutral-600 dark:text-neutral-400 hover:text-neutral-950 dark:hover:text-white'
-                      }`}
-                    >
-                      <Moon className="w-3.5 h-3.5" />
-                    </button>
-                  </div>
                 </div>
               </div>
             </div>
@@ -1135,66 +1192,43 @@ export default function App() {
                   onRunGeminiCustomTrace={handleRunGeminiCustomTrace}
                   isTracingGemini={isTracingGemini}
                   currentStep={currentStep}
+                  stepIndex={boundedStepIndex}
+                  totalSteps={steps.length}
+                  onStepCommand={handleStepCommand}
                 />
               </div>
 
-              {/* Right Column: Manual Step-by-Step Controller, Active Recall, Complexity Diff & Memory Canvas */}
-              <div className="lg:col-span-7 space-y-5">
-                <div className="rounded-lg border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-[#111111] p-5 space-y-4">
-                  {/* Manual Line-by-Line Step Controller (No Auto-Play All At Once) */}
-                  <div className="flex flex-wrap items-center justify-between gap-3">
-                    <div className="flex flex-wrap items-center gap-2">
-                      <button
-                        type="button"
-                        onClick={() => handleStepCommand('reset')}
-                        disabled={boundedStepIndex === 0}
-                        aria-label="Reset execution trace to step 1"
-                        className="px-3 py-2 rounded-md border border-neutral-300 dark:border-neutral-800 hover:bg-neutral-100 dark:hover:bg-neutral-800 disabled:opacity-40 text-xs font-medium text-neutral-700 dark:text-neutral-300 flex items-center gap-1.5 transition-colors whitespace-nowrap shrink-0"
-                      >
-                        <RotateCcw className="w-3.5 h-3.5" />
-                        Reset (Step 1)
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => handleStepCommand('prev')}
-                        disabled={boundedStepIndex === 0}
-                        aria-label="Previous Line Execution"
-                        className="px-3.5 py-2 rounded-md border border-neutral-300 dark:border-neutral-800 hover:bg-neutral-100 dark:hover:bg-neutral-800 disabled:opacity-40 text-xs font-medium text-neutral-800 dark:text-neutral-200 flex items-center gap-1 transition-colors whitespace-nowrap shrink-0"
-                      >
-                        <ChevronLeft className="w-4 h-4" />
-                        Prev Line
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => handleStepCommand('next')}
-                        disabled={boundedStepIndex >= steps.length - 1}
-                        aria-label="Next Line Execution"
-                        className="px-4 py-2 rounded-md bg-neutral-900 hover:bg-neutral-800 dark:bg-neutral-100 dark:hover:bg-white disabled:opacity-40 text-white dark:text-neutral-950 text-xs font-semibold flex items-center gap-1.5 transition-colors whitespace-nowrap shrink-0"
-                      >
-                        Next Line Execution
-                        <ChevronRight className="w-4 h-4" />
-                      </button>
+              {/* Right Column: Step Intuition, Active Recall, Complexity Diff & Hero Memory Canvas */}
+              <div className="lg:col-span-7 space-y-4">
+                <div className="rounded-xl border border-neutral-200/80 dark:border-neutral-800/80 bg-white dark:bg-[#111111] p-4 shadow-[0_1px_3px_rgba(0,0,0,0.04)] space-y-3">
+                  <div className="flex flex-wrap items-center justify-between gap-2 pb-2.5 border-b border-neutral-100 dark:border-neutral-800/80">
+                    <div className="flex items-center gap-2">
+                      <span className="px-2 py-0.5 rounded bg-blue-50 dark:bg-blue-950/60 border border-blue-200 dark:border-blue-800 text-blue-700 dark:text-blue-300 font-mono text-xs font-bold tabular-nums">
+                        Step {boundedStepIndex + 1} of {steps.length}
+                      </span>
+                      <h3 className="text-sm font-bold text-neutral-950 dark:text-neutral-100">
+                        {currentStep.title}
+                      </h3>
                     </div>
 
-                    {/* Step Progress & Analysis Toggles */}
-                    <div className="flex flex-wrap items-center gap-2">
+                    <div className="flex items-center gap-1.5">
                       <button
                         type="button"
                         onClick={() => setPredictModeActive((v) => !v)}
-                        className={`px-2.5 py-1.5 text-xs font-medium rounded-md border transition-colors flex items-center gap-1.5 whitespace-nowrap shrink-0 ${
+                        className={`px-2.5 py-1 text-xs font-medium rounded-md border transition-colors flex items-center gap-1.5 whitespace-nowrap shrink-0 ${
                           predictModeActive
                             ? 'border-neutral-900 bg-neutral-900 text-white dark:border-neutral-100 dark:bg-neutral-100 dark:text-neutral-950'
                             : 'border-neutral-300 dark:border-neutral-800 text-neutral-700 dark:text-neutral-300 hover:bg-neutral-100 dark:hover:bg-neutral-900'
                         }`}
                       >
                         <HelpCircle className="w-3.5 h-3.5" />
-                        Predict Next Move
+                        Predict Target
                       </button>
 
                       <button
                         type="button"
                         onClick={() => setShowComplexityDiff((v) => !v)}
-                        className={`px-2.5 py-1.5 text-xs font-medium rounded-md border transition-colors flex items-center gap-1.5 whitespace-nowrap shrink-0 ${
+                        className={`px-2.5 py-1 text-xs font-medium rounded-md border transition-colors flex items-center gap-1.5 whitespace-nowrap shrink-0 ${
                           showComplexityDiff
                             ? 'border-neutral-900 bg-neutral-900 text-white dark:border-neutral-100 dark:bg-neutral-100 dark:text-neutral-950'
                             : 'border-neutral-300 dark:border-neutral-800 text-neutral-700 dark:text-neutral-300 hover:bg-neutral-100 dark:hover:bg-neutral-900'
@@ -1210,7 +1244,7 @@ export default function App() {
                           setIsTutorOpen(true);
                           setVoiceTriggerCount((c) => c + 1);
                         }}
-                        className="px-2.5 py-1.5 text-xs font-medium rounded-md border border-neutral-300 dark:border-neutral-800 text-neutral-700 dark:text-neutral-300 hover:bg-neutral-100 dark:hover:bg-neutral-900 transition-colors flex items-center gap-1 whitespace-nowrap shrink-0"
+                        className="px-2.5 py-1 text-xs font-medium rounded-md border border-neutral-300 dark:border-neutral-800 text-neutral-700 dark:text-neutral-300 hover:bg-neutral-100 dark:hover:bg-neutral-900 transition-colors flex items-center gap-1 whitespace-nowrap shrink-0"
                       >
                         <Volume2 className="w-3.5 h-3.5" />
                         Voice
@@ -1218,43 +1252,26 @@ export default function App() {
                     </div>
                   </div>
 
-                  {/* Step Scrubber & Active Line Indicator */}
-                  <div className="flex items-center gap-4">
-                    <div className="flex-1">
-                      <label htmlFor="timeline-scrubber" className="sr-only">
-                        Execution Step Scrubber
-                      </label>
-                      <input
-                        id="timeline-scrubber"
-                        type="range"
-                        min={0}
-                        max={Math.max(0, steps.length - 1)}
-                        value={boundedStepIndex}
-                        onChange={(e) => setStepIndex(Number(e.target.value))}
-                        className="w-full accent-neutral-900 dark:accent-neutral-100 cursor-pointer"
-                      />
-                    </div>
-                    <span className="text-xs font-mono font-semibold text-neutral-900 dark:text-neutral-100 tabular-nums shrink-0">
-                      Step {boundedStepIndex + 1} of {steps.length} · Line{' '}
-                      {language === 'python' ? currentStep.pythonLine : currentStep.javaLine}
+                  <p className="text-xs sm:text-sm text-neutral-700 dark:text-neutral-300 leading-relaxed font-sans">
+                    {currentStep.intuition}
+                  </p>
+
+                  <div className="flex items-center gap-3 pt-2 border-t border-neutral-100 dark:border-neutral-800/80">
+                    <span className="text-xs font-mono text-neutral-400">Scrub:</span>
+                    <input
+                      id="timeline-scrubber"
+                      type="range"
+                      min={0}
+                      max={Math.max(0, steps.length - 1)}
+                      value={boundedStepIndex}
+                      onChange={(e) => setStepIndex(Number(e.target.value))}
+                      className="flex-1 accent-blue-600 cursor-pointer h-1.5"
+                    />
+                    <span className="text-xs font-mono text-neutral-500 tabular-nums">
+                      Line {language === 'python' ? currentStep.pythonLine : currentStep.javaLine}
                     </span>
                   </div>
-
-                  {/* Current Step Explanation Callout */}
-                  <div className="p-3.5 rounded-md bg-neutral-50 dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800">
-                    <div className="flex flex-wrap items-center justify-between gap-2 text-xs font-mono text-neutral-900 dark:text-neutral-200 font-semibold mb-1">
-                      <span>
-                        Step {boundedStepIndex + 1}: {currentStep.title}
-                      </span>
-                      <span className="text-neutral-500 dark:text-neutral-400 font-normal">
-                        {LANGUAGE_LABELS[language]} · Executing Line{' '}
-                        {language === 'python' ? currentStep.pythonLine : currentStep.javaLine}
-                      </span>
-                    </div>
-                    <p className="text-xs sm:text-sm text-neutral-700 dark:text-neutral-300 leading-relaxed">
-                      {currentStep.intuition}
-                    </p>
-                  </div>
+                </div>
 
                   {/* Interactive "Predict the Next Step" Active Recall Deck */}
                   {predictModeActive && predictQuestion && (
@@ -1382,7 +1399,6 @@ export default function App() {
                       </div>
                     </div>
                   )}
-                </div>
 
                 {/* Dynamic Memory Allocation, Pointer Canvas & Recursion Call-Tree Flamegraph */}
                 <MemoryCanvas

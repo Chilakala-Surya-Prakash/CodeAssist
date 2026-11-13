@@ -1,4 +1,5 @@
 import { GoogleGenAI, Type } from '@google/genai';
+import type { VercelRequest, VercelResponse } from '@vercel/node';
 
 function getGenAIClient(): GoogleGenAI {
   const apiKey = process.env.GEMINI_API_KEY;
@@ -18,7 +19,7 @@ function getGenAIClient(): GoogleGenAI {
   });
 }
 
-export default async function handler(req: any, res: any) {
+export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (req.method !== 'POST') {
     res.status(405).json({ error: 'Method not allowed. Use POST.' });
     return;
@@ -30,6 +31,10 @@ export default async function handler(req: any, res: any) {
 
     if (!code || typeof code !== 'string') {
       res.status(400).json({ error: 'Code is required to generate a custom trace.' });
+      return;
+    }
+    if (code.length > 8000) {
+      res.status(400).json({ error: 'Code too long (max 8000 characters). Paste only the core algorithm.' });
       return;
     }
 
