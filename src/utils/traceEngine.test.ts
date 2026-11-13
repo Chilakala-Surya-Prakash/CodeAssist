@@ -18,6 +18,7 @@ import {
   updateSpacedRepetition,
 } from './zeroCostEngines';
 import { computeStepSoundProfile, DEFAULT_DSP_CONFIG } from './soundEngine';
+import { CANVAS_THEMES } from './canvasThemes';
 
 test('1. Company dataset contains at least 50 top tech firms with valid question references and metadata', () => {
   assert.ok(
@@ -289,3 +290,28 @@ test('12. Advanced Engines: Diff Mode, Active Recall, 16-Case Test Runner, Recur
   assert.ok(dspProfile.stereoPan >= -1 && dspProfile.stereoPan <= 1);
   assert.ok(dspProfile.linearGain > 0 && dspProfile.linearGain < 1);
 });
+
+test('13. Visualizer Canvas Theme Templates & Scenario Input Templates', () => {
+  const themeKeys = Object.keys(CANVAS_THEMES);
+  assert.equal(themeKeys.length, 4);
+  assert.deepEqual(themeKeys.sort(), ['blueprint', 'glass', 'neon', 'paper']);
+
+  for (const key of themeKeys as (keyof typeof CANVAS_THEMES)[]) {
+    const theme = CANVAS_THEMES[key];
+    assert.ok(theme.name.length > 0);
+    assert.ok(theme.icon.length > 0);
+    assert.ok(theme.containerClass.length > 0);
+    assert.ok(theme.cardBaseClass.length > 0);
+    assert.ok(theme.svgArrowColor.startsWith('#'));
+  }
+
+  // Verify problems run sample input scenarios cleanly
+  for (const problem of PROBLEMS.slice(0, 10)) {
+    for (const sample of problem.sampleInputs) {
+      const trace = generateExecutionTrace(problem.id, sample.value);
+      assert.ok(trace.length >= 2, `${problem.id} sample ${sample.label} must generate >=2 steps`);
+      assert.ok(trace[0].heapObjects.length >= 1);
+    }
+  }
+});
+

@@ -34,6 +34,7 @@ import {
 } from './utils/soundEngine';
 import { MemoryCanvas } from './components/MemoryCanvas';
 import { CodeEditorPanel } from './components/CodeEditorPanel';
+import { ScenarioTemplatesBar } from './components/ScenarioTemplatesBar';
 
 const CompanyDirectory = lazy(() =>
   import('./components/CompanyDirectory').then((m) => ({ default: m.CompanyDirectory }))
@@ -1399,6 +1400,17 @@ export default function App() {
                       </div>
                     </div>
                   )}
+
+                {/* Available Scenario & Input Templates Bar */}
+                <ScenarioTemplatesBar
+                  problem={currentProblem}
+                  customInput={customInput}
+                  onSelectTemplate={(newInput) => {
+                    setCustomInput(newInput);
+                    setCustomSteps(null);
+                    setStepIndex(0);
+                  }}
+                />
 
                 {/* Dynamic Memory Allocation, Pointer Canvas & Recursion Call-Tree Flamegraph */}
                 <MemoryCanvas

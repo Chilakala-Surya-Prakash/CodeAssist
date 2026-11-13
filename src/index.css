@@ -44,3 +44,44 @@
 ::-webkit-scrollbar-thumb:hover {
   background: rgba(115, 115, 115, 0.48);
 }
+
+/* Eye-Catching Animated Flow & Glow Effects for TraceCraft Visualizer */
+@keyframes flowDash {
+  from {
+    stroke-dashoffset: 20;
+  }
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+
+.animate-flow-dash {
+  animation: flowDash 0.8s linear infinite;
+}
+
+@keyframes pulseGlowCyan {
+  0%, 100% {
+    box-shadow: 0 0 16px rgba(34, 211, 238, 0.4), 0 0 32px rgba(34, 211, 238, 0.15);
+  }
+  50% {
+    box-shadow: 0 0 28px rgba(34, 211, 238, 0.75), 0 0 48px rgba(34, 211, 238, 0.3);
+  }
+}
+
+.glow-active-neon {
+  animation: pulseGlowCyan 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}
+
+@keyframes pulseGlowEmerald {
+  0%, 100% {
+    box-shadow: 0 0 16px rgba(52, 211, 153, 0.45), 0 0 32px rgba(52, 211, 153, 0.2);
+  }
+  50% {
+    box-shadow: 0 0 30px rgba(52, 211, 153, 0.8), 0 0 52px rgba(52, 211, 153, 0.35);
+  }
+}
+
+.glow-mutated-emerald {
+  animation: pulseGlowEmerald 1.8s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}
+

@@ -2,6 +2,8 @@ export type Language = 'python' | 'java' | 'cpp' | 'go' | 'typescript' | 'rust';
 
 export type Difficulty = 'Easy' | 'Medium' | 'Hard';
 
+export type CanvasThemeTemplate = 'glass' | 'neon' | 'blueprint' | 'paper';
+
 export type CoreTopic =
   | 'Arrays'
   | 'Linked Lists'
