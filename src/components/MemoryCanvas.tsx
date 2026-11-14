@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { LayoutGroup, MotionConfig, motion } from 'motion/react';
 import { CanvasThemeTemplate, ExecutionStep, HeapCell, HeapObject, PointerRef } from '../types/visualizer';
 import { RecursionTreeNode } from '../utils/zeroCostEngines';
 import { CANVAS_THEMES } from '../utils/canvasThemes';
@@ -205,12 +206,15 @@ export const MemoryCanvas: React.FC<MemoryCanvasProps> = ({
               <div className="mb-4 flex items-center gap-2 text-xs font-mono">
                 <span className="opacity-75">NULL Register:</span>
                 {nullPointers.map((np) => (
-                  <span
+                  <motion.span
+                    layout="position"
+                    layoutId={`ptr-${np.id}`}
+                    transition={{ type: 'spring', stiffness: 420, damping: 32 }}
                     key={np.id}
                     className={`px-2.5 py-0.5 rounded-md border border-dashed font-semibold shadow-2xs tabular-nums ${theme.badgeMutedClass}`}
                   >
                     *{np.name} → NULL (0x0000)
-                  </span>
+                  </motion.span>
                 ))}
               </div>
             )}
@@ -242,12 +246,15 @@ export const MemoryCanvas: React.FC<MemoryCanvasProps> = ({
                         {cellPtrs.map((ptr) => {
                           const pColor = getPointerSemanticColor(ptr.name);
                           return (
-                            <span
+                            <motion.span
+                              layout="position"
+                              layoutId={`ptr-${ptr.id}`}
+                              transition={{ type: 'spring', stiffness: 420, damping: 32 }}
                               key={ptr.id}
-                              className={`px-2 py-0.5 text-[11px] font-mono font-bold rounded-md border whitespace-nowrap transition-all ${pColor.badge}`}
+                              className={`px-2 py-0.5 text-[11px] font-mono font-bold rounded-md border whitespace-nowrap ${pColor.badge}`}
                             >
                               *{ptr.name} ↓
-                            </span>
+                            </motion.span>
                           );
                         })}
                       </div>
@@ -256,7 +263,7 @@ export const MemoryCanvas: React.FC<MemoryCanvasProps> = ({
                         onClick={() => onCellClick?.(cell.index)}
                         role={onCellClick ? 'button' : undefined}
                         tabIndex={onCellClick ? 0 : undefined}
-                        className={`w-32 sm:w-36 ${theme.cardBaseClass} ${
+                        className={`animate-cell-enter w-32 sm:w-36 ${theme.cardBaseClass} ${
                           onCellClick ? 'cursor-pointer hover:border-cyan-400' : ''
                         } ${
                           isMutated
@@ -270,7 +277,7 @@ export const MemoryCanvas: React.FC<MemoryCanvasProps> = ({
                             : theme.cardIdleClass
                         }`}
                       >
-                        <div className="px-2.5 py-1 border-b border-black/10 dark:border-white/10 flex items-center justify-between text-[10px] font-mono opacity-80">
+                        <div className="px-2.5 py-1 border-b border-black/10 dark:border-white/10 flex items-center justify-between text-[11px] font-mono opacity-80">
                           <span className="font-semibold tabular-nums">
                             {cell.addressOffset}
                           </span>
@@ -287,13 +294,13 @@ export const MemoryCanvas: React.FC<MemoryCanvasProps> = ({
 
                         <div className="grid grid-cols-2 divide-x divide-black/10 dark:divide-white/10">
                           <div className="p-2 text-center">
-                            <div className="text-[10px] font-mono uppercase opacity-50">val</div>
+                            <div className="text-[11px] font-mono uppercase opacity-50">val</div>
                             <div className="text-base font-mono font-bold tabular-nums">
                               {cell.value}
                             </div>
                           </div>
                           <div className="p-2 text-center">
-                            <div className="text-[10px] font-mono uppercase opacity-50">.next</div>
+                            <div className="text-[11px] font-mono uppercase opacity-50">.next</div>
                             <div className="text-[11px] font-mono font-medium truncate tabular-nums">
                               {cell.nextAddress ? (
                                 <span className="text-violet-400 font-semibold">{cell.nextAddress}</span>
@@ -305,7 +312,7 @@ export const MemoryCanvas: React.FC<MemoryCanvasProps> = ({
                         </div>
 
                         {cell.annotation && (
-                          <div className="px-2.5 py-1 border-t border-black/10 dark:border-white/10 text-[10px] font-mono opacity-80 flex items-center justify-between">
+                          <div className="px-2.5 py-1 border-t border-black/10 dark:border-white/10 text-[11px] font-mono opacity-80 flex items-center justify-between">
                             <span className="truncate">{cell.annotation}</span>
                             {nextPointsBackwardToCurr && (
                               <RotateCcw className="w-3 h-3 text-emerald-400 shrink-0" />
@@ -318,16 +325,16 @@ export const MemoryCanvas: React.FC<MemoryCanvasProps> = ({
                     {idx < heap.cells.length - 1 && (
                       <div className="flex flex-col items-center justify-center pt-8 px-1">
                         {nextPointsBackwardToCurr ? (
-                          <div className="flex flex-col items-center text-emerald-400 font-mono text-[10px] font-bold">
-                            <span className="text-[9px] mb-0.5 text-emerald-400 uppercase tracking-wider">reversed</span>
+                          <div className="flex flex-col items-center text-emerald-400 font-mono text-[11px] font-bold">
+                            <span className="text-[11px] mb-0.5 text-emerald-400 uppercase tracking-wider">reversed</span>
                             <div className="flex items-center gap-1 px-1.5 py-0.5 rounded bg-emerald-500/20 border border-emerald-500/60 shadow-[0_0_12px_rgba(52,211,153,0.3)]">
                               <span className="text-xs font-bold">←</span>
                               <span>.next</span>
                             </div>
                           </div>
                         ) : isSeveredBetween ? (
-                          <div className="flex flex-col items-center text-red-400 font-mono text-[10px]">
-                            <span className="text-[9px] text-red-500 font-bold uppercase tracking-wider">broken</span>
+                          <div className="flex flex-col items-center text-red-400 font-mono text-[11px]">
+                            <span className="text-[11px] text-red-500 font-bold uppercase tracking-wider">broken</span>
                             <div className="px-1.5 py-0.5 rounded border border-dashed border-red-500/60 bg-red-950/40 text-red-400 font-bold">
                               ⨯
                             </div>
@@ -353,7 +360,7 @@ export const MemoryCanvas: React.FC<MemoryCanvasProps> = ({
                                 style={{ filter: theme.svgGlowFilter !== 'none' ? `url(#glow-${theme.id}-${cell.index})` : undefined }}
                               />
                             </svg>
-                            <span className="text-[9px] font-mono tracking-tight opacity-60">.next</span>
+                            <span className="text-[11px] font-mono tracking-tight opacity-60">.next</span>
                           </div>
                         )}
                       </div>
@@ -407,7 +414,7 @@ export const MemoryCanvas: React.FC<MemoryCanvasProps> = ({
                   >
                     <div className="flex items-center justify-between text-[11px] font-mono opacity-75">
                       <span className="font-semibold">{cell.label}</span>
-                      <span className="tabular-nums text-[10px]">{cell.addressOffset}</span>
+                      <span className="tabular-nums text-[11px]">{cell.addressOffset}</span>
                     </div>
 
                     <div className="flex items-baseline justify-between">
@@ -415,7 +422,7 @@ export const MemoryCanvas: React.FC<MemoryCanvasProps> = ({
                         {cell.value}
                       </div>
                       <span
-                        className={`px-2 py-0.5 rounded text-[10px] font-mono font-bold uppercase ${
+                        className={`px-2 py-0.5 rounded text-[11px] font-mono font-bold uppercase ${
                           isTarget
                             ? 'bg-blue-600 text-white'
                             : isMutated
@@ -438,9 +445,9 @@ export const MemoryCanvas: React.FC<MemoryCanvasProps> = ({
                         {cellPtrs.map((p) => {
                           const pCol = getPointerSemanticColor(p.name);
                           return (
-                            <span key={p.id} className={`px-1.5 py-0.5 rounded text-[10px] font-mono font-bold ${pCol.badge}`}>
+                            <motion.span layout="position" layoutId={`ptr-${p.id}`} transition={{ type: 'spring', stiffness: 420, damping: 32 }} key={p.id} className={`px-1.5 py-0.5 rounded text-[11px] font-mono font-bold ${pCol.badge}`}>
                               *{p.name}
-                            </span>
+                            </motion.span>
                           );
                         })}
                       </div>
@@ -482,28 +489,28 @@ export const MemoryCanvas: React.FC<MemoryCanvasProps> = ({
                           }`}
                         >
                           <div className="flex items-center gap-2">
-                            <span className="text-[10px] opacity-60 tabular-nums">[{cell.index}]</span>
+                            <span className="text-[11px] opacity-60 tabular-nums">[{cell.index}]</span>
                             <span className="text-sm font-bold tabular-nums">{cell.value}</span>
                           </div>
                           <div className="flex items-center gap-1.5">
                             {isTop && (
-                              <span className="px-1.5 py-0.5 rounded text-[10px] bg-amber-500 text-black font-bold">
+                              <span className="px-1.5 py-0.5 rounded text-[11px] bg-amber-500 text-black font-bold">
                                 *TOP
                               </span>
                             )}
                             {cellPtrs.map((p) => (
-                              <span key={p.id} className="px-1.5 py-0.5 rounded text-[10px] bg-blue-600 text-white font-semibold">
+                              <motion.span layout="position" layoutId={`ptr-${p.id}`} transition={{ type: 'spring', stiffness: 420, damping: 32 }} key={p.id} className="px-1.5 py-0.5 rounded text-[11px] bg-blue-600 text-white font-semibold">
                                 *{p.name}
-                              </span>
+                              </motion.span>
                             ))}
-                            <span className="text-[10px] opacity-60">{cell.addressOffset}</span>
+                            <span className="text-[11px] opacity-60">{cell.addressOffset}</span>
                           </div>
                         </div>
                       );
                     })}
                   </div>
                 )}
-                <div className="text-[10px] font-mono opacity-50 text-center pt-1 border-t border-white/10">
+                <div className="text-[11px] font-mono opacity-50 text-center pt-1 border-t border-white/10">
                   STACK BASE (0x00)
                 </div>
               </div>
@@ -511,7 +518,7 @@ export const MemoryCanvas: React.FC<MemoryCanvasProps> = ({
               {/* Stack Details & Invariant Note */}
               <div className="flex-1 space-y-3">
                 <div className={`p-3 rounded-lg border ${theme.subPanelClass} text-xs font-mono`}>
-                  <div className="opacity-60 text-[10px] mb-1">MONOTONIC / LIFO INVARIANT</div>
+                  <div className="opacity-60 text-[11px] mb-1">MONOTONIC / LIFO INVARIANT</div>
                   <p className="leading-relaxed opacity-90">
                     Stack preserves strict order for next-greater element or balanced delimiter validation.
                     Elements are popped whenever the incoming element breaks the monotonic invariant.
@@ -519,11 +526,11 @@ export const MemoryCanvas: React.FC<MemoryCanvasProps> = ({
                 </div>
                 <div className="grid grid-cols-2 gap-2 text-xs font-mono">
                   <div className={`p-2.5 rounded border ${theme.subPanelClass}`}>
-                    <span className="opacity-60 block text-[10px]">DEPTH</span>
+                    <span className="opacity-60 block text-[11px]">DEPTH</span>
                     <strong className="tabular-nums">{heap.cells.length} items</strong>
                   </div>
                   <div className={`p-2.5 rounded border ${theme.subPanelClass}`}>
-                    <span className="opacity-60 block text-[10px]">MEMORY USAGE</span>
+                    <span className="opacity-60 block text-[11px]">MEMORY USAGE</span>
                     <strong className="tabular-nums">{heap.byteSize} bytes</strong>
                   </div>
                 </div>
@@ -560,7 +567,7 @@ export const MemoryCanvas: React.FC<MemoryCanvasProps> = ({
                           : theme.cardIdleClass
                       }`}
                     >
-                      <div className="flex items-center justify-between text-[10px] opacity-60 mb-1">
+                      <div className="flex items-center justify-between text-[11px] opacity-60 mb-1">
                         <span>KEY: <strong className="opacity-100">{cell.label}</strong></span>
                         <span className="tabular-nums">{cell.addressOffset}</span>
                       </div>
@@ -568,7 +575,7 @@ export const MemoryCanvas: React.FC<MemoryCanvasProps> = ({
                         → {cell.value}
                       </div>
                       {cell.annotation && (
-                        <div className="text-[10px] mt-1 opacity-75 truncate">
+                        <div className="text-[11px] mt-1 opacity-75 truncate">
                           {cell.annotation}
                         </div>
                       )}
@@ -607,7 +614,7 @@ export const MemoryCanvas: React.FC<MemoryCanvasProps> = ({
                               : theme.cardIdleClass
                           }`}
                         >
-                          <div className="text-[10px] font-mono opacity-50 tabular-nums mb-1">
+                          <div className="text-[11px] font-mono opacity-50 tabular-nums mb-1">
                             {cell.addressOffset}
                           </div>
                           <div className="text-base font-mono font-bold tabular-nums">
@@ -618,9 +625,9 @@ export const MemoryCanvas: React.FC<MemoryCanvasProps> = ({
                               {cellPtrs.map((p) => {
                                 const pCol = getPointerSemanticColor(p.name);
                                 return (
-                                  <span key={p.id} className={`px-1.5 py-0.5 rounded text-[10px] font-mono font-bold ${pCol.badge}`}>
+                                  <motion.span layout="position" layoutId={`ptr-${p.id}`} transition={{ type: 'spring', stiffness: 420, damping: 32 }} key={p.id} className={`px-1.5 py-0.5 rounded text-[11px] font-mono font-bold ${pCol.badge}`}>
                                     *{p.name}
-                                  </span>
+                                  </motion.span>
                                 );
                               })}
                             </div>
@@ -710,12 +717,15 @@ export const MemoryCanvas: React.FC<MemoryCanvasProps> = ({
                       {cellPtrs.map((ptr) => {
                         const col = getPointerSemanticColor(ptr.name);
                         return (
-                          <span
+                          <motion.span
+                            layout="position"
+                            layoutId={`ptr-${ptr.id}`}
+                            transition={{ type: 'spring', stiffness: 420, damping: 32 }}
                             key={ptr.id}
-                            className={`px-1.5 py-0.5 text-[10px] font-mono font-bold rounded ${col.badge}`}
+                            className={`px-1.5 py-0.5 text-[11px] font-mono font-bold rounded ${col.badge}`}
                           >
                             *{ptr.name}
-                          </span>
+                          </motion.span>
                         );
                       })}
                     </div>
@@ -738,14 +748,14 @@ export const MemoryCanvas: React.FC<MemoryCanvasProps> = ({
                           : theme.cardIdleClass
                       }`}
                     >
-                      <div className="flex items-center justify-between text-[10px] font-mono opacity-60 tabular-nums">
+                      <div className="flex items-center justify-between text-[11px] font-mono opacity-60 tabular-nums">
                         <span>{cell.label}</span>
                         <span>{cell.addressOffset}</span>
                       </div>
                       <div className="text-base font-mono font-bold tabular-nums my-1">
                         {cell.value}
                       </div>
-                      <div className="text-[10px] font-mono opacity-70 truncate">
+                      <div className="text-[11px] font-mono opacity-70 truncate">
                         {cell.annotation || cell.status}
                       </div>
                     </div>
@@ -760,6 +770,8 @@ export const MemoryCanvas: React.FC<MemoryCanvasProps> = ({
   };
 
   return (
+    <MotionConfig reducedMotion="user">
+    <LayoutGroup>
     <div className="flex flex-col gap-5" data-testid="memory-canvas">
       {/* Primary Data Structure Visualizer */}
       {renderDataStructure(primaryHeap, true)}
@@ -911,7 +923,7 @@ export const MemoryCanvas: React.FC<MemoryCanvasProps> = ({
                   }`}
                 >
                   <div className="flex items-center gap-2 min-w-0 tabular-nums">
-                    <span className="px-1.5 py-0.5 rounded text-[10px] border border-white/10">
+                    <span className="px-1.5 py-0.5 rounded text-[11px] border border-white/10">
                       D{node.depth} · {node.address}
                     </span>
                     <span className="truncate">{node.signature}</span>
@@ -921,7 +933,7 @@ export const MemoryCanvas: React.FC<MemoryCanvasProps> = ({
                       {node.returnSummary}
                     </span>
                     <span
-                      className={`px-1.5 py-0.5 rounded text-[10px] uppercase font-bold ${
+                      className={`px-1.5 py-0.5 rounded text-[11px] uppercase font-bold ${
                         isAct
                           ? 'bg-blue-600 text-white'
                           : isMemo
@@ -950,5 +962,7 @@ export const MemoryCanvas: React.FC<MemoryCanvasProps> = ({
         </button>
       )}
     </div>
+    </LayoutGroup>
+    </MotionConfig>
   );
 };

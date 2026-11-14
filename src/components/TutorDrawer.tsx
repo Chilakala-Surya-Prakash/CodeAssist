@@ -43,6 +43,7 @@ export const TutorDrawer: React.FC<TutorDrawerProps> = ({
   const [liveStatus, setLiveStatus] = useState<string>('Idle');
   const [liveTranscript, setLiveTranscript] = useState<string>('');
 
+  const panelRef = useRef<HTMLElement | null>(null);
   const wsRef = useRef<WebSocket | null>(null);
   const audioPlayerRef = useRef<LiveAudioPlayer | null>(null);
   const micStreamRef = useRef<MediaStream | null>(null);
@@ -391,10 +392,25 @@ export const TutorDrawer: React.FC<TutorDrawerProps> = ({
     }
   };
 
+  // Dialog behaviour: move focus into the panel on open, close on Escape
+  useEffect(() => {
+    if (!isOpen) return;
+    panelRef.current?.focus();
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') onClose();
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [isOpen, onClose]);
+
   if (!isOpen) return null;
 
   return (
     <aside
+      ref={panelRef}
+      role="dialog"
+      aria-modal="false"
+      tabIndex={-1}
       aria-label="AI Tutor and Live Voice Mode Panel"
       className="fixed inset-y-0 right-0 z-50 w-full sm:w-[420px] bg-white dark:bg-[#111111] border-l border-neutral-200 dark:border-neutral-800 shadow-2xl flex flex-col"
     >
@@ -484,7 +500,7 @@ export const TutorDrawer: React.FC<TutorDrawerProps> = ({
 
         {liveTranscript && (
           <div className="p-2.5 rounded-md bg-white dark:bg-neutral-950 border border-neutral-200 dark:border-neutral-800 text-xs text-neutral-700 dark:text-neutral-300 max-h-28 overflow-y-auto">
-            <div className="text-[10px] font-mono text-neutral-500 mb-1">
+            <div className="text-[11px] font-mono text-neutral-500 mb-1">
               Voice Transcript:
             </div>
             {liveTranscript}
@@ -540,7 +556,7 @@ export const TutorDrawer: React.FC<TutorDrawerProps> = ({
                 : 'bg-neutral-100 dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 text-neutral-800 dark:text-neutral-200 mr-4'
             }`}
           >
-            <div className="flex items-center justify-between text-[10px] font-mono opacity-75 mb-1">
+            <div className="flex items-center justify-between text-[11px] font-mono opacity-75 mb-1">
               <span>{msg.role === 'user' ? 'You' : 'TraceCraft Mentor'}</span>
               <span>{msg.timestamp}</span>
             </div>

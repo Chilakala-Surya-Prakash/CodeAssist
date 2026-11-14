@@ -126,7 +126,7 @@ export const ScenarioTemplatesBar: React.FC<ScenarioTemplatesBarProps> = ({
           <Sparkles className="w-3.5 h-3.5 text-blue-600 dark:text-blue-400" />
           <span>Available Templates & Scenarios</span>
           {activeLabelToast && (
-            <span className="ml-2 px-2 py-0.5 rounded-full bg-blue-50 dark:bg-blue-950/60 border border-blue-200 dark:border-blue-800 text-blue-700 dark:text-blue-300 font-mono text-[10px] font-bold animate-fade-in">
+            <span className="ml-2 px-2 py-0.5 rounded-full bg-blue-50 dark:bg-blue-950/60 border border-blue-200 dark:border-blue-800 text-blue-700 dark:text-blue-300 font-mono text-[11px] font-bold animate-fade-in">
               Active: {activeLabelToast}
             </span>
           )}
@@ -194,11 +194,11 @@ export const ScenarioTemplatesBar: React.FC<ScenarioTemplatesBarProps> = ({
               {isSelected ? (
                 <Check className="w-3 h-3 text-emerald-600 dark:text-emerald-400" />
               ) : (
-                <span className="text-[10px] opacity-60">⚡</span>
+                <span className="text-[11px] opacity-60">⚡</span>
               )}
               <span>{edge.label}</span>
               {edge.badge && (
-                <span className="text-[9px] px-1 py-0.2 rounded bg-neutral-200 dark:bg-neutral-800 text-neutral-600 dark:text-neutral-400 font-sans">
+                <span className="text-[11px] px-1 py-0.2 rounded bg-neutral-200 dark:bg-neutral-800 text-neutral-600 dark:text-neutral-400 font-sans">
                   {edge.badge}
                 </span>
               )}

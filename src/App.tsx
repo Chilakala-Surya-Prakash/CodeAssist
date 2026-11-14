@@ -57,6 +57,8 @@ import {
   Moon,
   RotateCcw,
   Scale,
+  Pause,
+  Play,
   Server,
   Share2,
   Sliders,
@@ -313,6 +315,43 @@ export default function App() {
   const steps = customSteps && customSteps.length > 0 ? customSteps : deterministicSteps;
   const boundedStepIndex = Math.min(stepIndex, Math.max(0, steps.length - 1));
   const currentStep = steps[boundedStepIndex] || steps[0];
+
+  // Autoplay: advance one step per tick; stop at the last step
+  const [isPlaying, setIsPlaying] = useState<boolean>(false);
+  const [playDelayMs, setPlayDelayMs] = useState<number>(1600);
+
+  useEffect(() => {
+    if (!isPlaying) return;
+    if (boundedStepIndex >= steps.length - 1) {
+      setIsPlaying(false);
+      return;
+    }
+    const t = window.setTimeout(() => setStepIndex((i) => Math.min(steps.length - 1, i + 1)), playDelayMs);
+    return () => window.clearTimeout(t);
+  }, [isPlaying, boundedStepIndex, steps.length, playDelayMs]);
+
+  // Stop playback when the problem or trace changes
+  useEffect(() => {
+    setIsPlaying(false);
+  }, [currentProblem.id, customSteps]);
+
+  // Keyboard stepping: ← → Home End, Space toggles play (ignored while typing)
+  useEffect(() => {
+    if (activeTab !== 'visualizer') return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.metaKey || e.ctrlKey || e.altKey) return;
+      const el = e.target as HTMLElement | null;
+      const tag = el?.tagName;
+      if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT' || el?.isContentEditable) return;
+      if (e.key === 'ArrowRight') { e.preventDefault(); setStepIndex((i) => Math.min(steps.length - 1, i + 1)); }
+      else if (e.key === 'ArrowLeft') { e.preventDefault(); setStepIndex((i) => Math.max(0, i - 1)); }
+      else if (e.key === 'Home') { e.preventDefault(); setStepIndex(0); }
+      else if (e.key === 'End') { e.preventDefault(); setStepIndex(steps.length - 1); }
+      else if (e.key === ' ' && tag !== 'BUTTON') { e.preventDefault(); setIsPlaying((p) => !p); }
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [activeTab, steps.length]);
 
   const complexityDiff = useMemo(
     () => computeComplexityDiff(currentProblem, steps, boundedStepIndex),
@@ -694,7 +733,7 @@ export default function App() {
                       </option>
                     ))}
                   </select>
-                  <span className="pointer-events-none absolute right-2 text-[10px] text-neutral-400">▾</span>
+                  <span className="pointer-events-none absolute right-2 text-[11px] text-neutral-400">▾</span>
                 </div>
 
                 <span className="text-neutral-300 dark:text-neutral-700">/</span>
@@ -714,12 +753,12 @@ export default function App() {
                       </option>
                     ))}
                   </select>
-                  <span className="pointer-events-none absolute right-2 text-[10px] text-neutral-400">▾</span>
+                  <span className="pointer-events-none absolute right-2 text-[11px] text-neutral-400">▾</span>
                 </div>
 
                 {/* Difficulty Badge */}
                 <span
-                  className={`px-2 py-0.5 rounded text-[10px] font-mono font-bold uppercase tracking-wider ${
+                  className={`px-2 py-0.5 rounded text-[11px] font-mono font-bold uppercase tracking-wider ${
                     currentProblem.difficulty === 'Easy'
                       ? 'bg-emerald-50 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-400 border border-emerald-300/60 dark:border-emerald-800/60'
                       : currentProblem.difficulty === 'Medium'
@@ -1257,7 +1296,53 @@ export default function App() {
                     {currentStep.intuition}
                   </p>
 
-                  <div className="flex items-center gap-3 pt-2 border-t border-neutral-100 dark:border-neutral-800/80">
+                  <div className="sr-only-live" role="status" aria-live="polite" aria-atomic="true">
+                    Step {boundedStepIndex + 1} of {steps.length}: {currentStep.title}. {currentStep.intuition}
+                  </div>
+                  <div className="flex flex-wrap items-center gap-2 pt-2 border-t border-neutral-100 dark:border-neutral-800/80">
+                    <button
+                      type="button"
+                      onClick={() => setStepIndex((i) => Math.max(0, i - 1))}
+                      disabled={boundedStepIndex === 0}
+                      aria-label="Previous step"
+                      className="p-1.5 rounded-md border border-neutral-300 dark:border-neutral-700 text-neutral-700 dark:text-neutral-300 hover:bg-neutral-100 dark:hover:bg-neutral-900 disabled:opacity-40"
+                    >
+                      <ChevronLeft className="w-4 h-4" />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (boundedStepIndex >= steps.length - 1) setStepIndex(0);
+                        setIsPlaying((p) => !p);
+                      }}
+                      aria-label={isPlaying ? 'Pause autoplay' : 'Play steps automatically'}
+                      className="px-2.5 py-1.5 rounded-md bg-neutral-900 text-white dark:bg-neutral-100 dark:text-neutral-950 text-xs font-medium flex items-center gap-1"
+                    >
+                      {isPlaying ? <Pause className="w-3.5 h-3.5" /> : <Play className="w-3.5 h-3.5" />}
+                      {isPlaying ? 'Pause' : 'Play'}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setStepIndex((i) => Math.min(steps.length - 1, i + 1))}
+                      disabled={boundedStepIndex >= steps.length - 1}
+                      aria-label="Next step"
+                      className="p-1.5 rounded-md border border-neutral-300 dark:border-neutral-700 text-neutral-700 dark:text-neutral-300 hover:bg-neutral-100 dark:hover:bg-neutral-900 disabled:opacity-40"
+                    >
+                      <ChevronRight className="w-4 h-4" />
+                    </button>
+                    <select
+                      aria-label="Playback speed"
+                      value={playDelayMs}
+                      onChange={(e) => setPlayDelayMs(Number(e.target.value))}
+                      className="text-xs rounded-md border border-neutral-300 dark:border-neutral-700 bg-white dark:bg-neutral-900 text-neutral-800 dark:text-neutral-200 px-1.5 py-1.5"
+                    >
+                      <option value={2600}>0.5×</option>
+                      <option value={1600}>1×</option>
+                      <option value={800}>2×</option>
+                    </select>
+                    <span className="hidden sm:inline text-xs text-neutral-500">← → to step · Space to play</span>
+                  </div>
+                  <div className="flex items-center gap-3">
                     <span className="text-xs font-mono text-neutral-400">Scrub:</span>
                     <input
                       id="timeline-scrubber"

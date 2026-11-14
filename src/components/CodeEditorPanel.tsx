@@ -305,7 +305,7 @@ export const CodeEditorPanel: React.FC<CodeEditorPanelProps> = ({
                   }`}
                 >
                   <div className="w-12 shrink-0 flex items-center justify-between pr-3 text-neutral-400 dark:text-neutral-500 tabular-nums">
-                    <span className="w-3 text-[10px] text-blue-600 dark:text-blue-400 font-bold">
+                    <span className="w-3 text-[11px] text-blue-600 dark:text-blue-400 font-bold">
                       {isCurrent ? '▶' : hasBp ? '●' : ''}
                     </span>
                     <span>{lineNumber}</span>
