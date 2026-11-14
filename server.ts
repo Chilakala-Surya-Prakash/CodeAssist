@@ -15,11 +15,18 @@ import {
 } from '@google/genai';
 import {
   CHAT_SYSTEM_INSTRUCTION,
+  EXPLAIN_RESPONSE_SCHEMA,
   LIMITS,
   MODELS,
   TRACE_RESPONSE_SCHEMA,
   buildChatPrompt,
+  buildExplainPrompt,
   buildTracePrompt,
+  explainCacheKey,
+  getCachedExplain,
+  parseExplainBody,
+  parseExplainLines,
+  setCachedExplain,
   isAllowedOrigin,
   parseChatBody,
   parseTraceBody,
@@ -162,6 +169,33 @@ async function startServer() {
       res.json({ steps: parseTraceSteps(response.text ?? '[]') });
     } catch (error: any) {
       sendTutorError(res, error, 'Gemini /api/tutor/trace');
+    }
+  });
+
+  // 2b. Line-by-line code explanations (cached by code hash)
+  app.post('/api/tutor/explain', async (req, res) => {
+    try {
+      const parsed = parseExplainBody(req.body);
+      if ('error' in parsed) {
+        res.status(400).json({ error: parsed.error });
+        return;
+      }
+      const key = explainCacheKey(parsed.value);
+      const cached = getCachedExplain(key);
+      if (cached) {
+        res.json({ lines: cached, cached: true });
+        return;
+      }
+      const ai = getGenAIClient();
+      const response = await generateWithFallback(ai, {
+        contents: buildExplainPrompt(parsed.value),
+        config: { responseMimeType: 'application/json', responseSchema: EXPLAIN_RESPONSE_SCHEMA },
+      });
+      const lines = parseExplainLines(response.text ?? '[]', parsed.value.code.split('\n').length);
+      setCachedExplain(key, lines);
+      res.json({ lines, cached: false });
+    } catch (error: any) {
+      sendTutorError(res, error, 'Gemini /api/tutor/explain');
     }
   });
 

@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { LIMITS, isAllowedOrigin, parseChatBody, parseTraceBody, parseTraceSteps, sendTutorError } from './tutor.js';
+import { LIMITS, explainCacheKey, getCachedExplain, parseExplainBody, parseExplainLines, setCachedExplain, isAllowedOrigin, parseChatBody, parseTraceBody, parseTraceSteps, sendTutorError } from './tutor.js';
 
 test('chat: rejects missing/oversized message and code', () => {
   assert.ok('error' in parseChatBody({}));
@@ -33,4 +33,19 @@ test('errors are generic and status is clamped', () => {
   sendTutorError(res, { status: 99999, message: 'secret key abc' }, 'test');
   assert.equal(out.n, 500);
   assert.ok(!JSON.stringify(out.b).includes('secret'));
+});
+
+test('explain: validates input and filters model lines', () => {
+  assert.ok('error' in parseExplainBody({}));
+  assert.ok('error' in parseExplainBody({ code: 'x\n'.repeat(500) }));
+  const out = parseExplainLines('[{"line":1,"text":"a"},{"line":1,"text":"dup"},{"line":9,"text":"out of range"},{"line":2,"text":""},{"line":2,"text":"b"}]', 3);
+  assert.deepEqual(out, [{ line: 1, text: 'a' }, { line: 2, text: 'b' }]);
+  assert.throws(() => parseExplainLines('{}', 3));
+});
+
+test('explain cache keys depend on language and code', () => {
+  const a = { code: 'x', language: 'python', problemTitle: 't' };
+  assert.notEqual(explainCacheKey(a), explainCacheKey({ ...a, language: 'java' }));
+  setCachedExplain(explainCacheKey(a), [{ line: 1, text: 'hi' }]);
+  assert.deepEqual(getCachedExplain(explainCacheKey(a)), [{ line: 1, text: 'hi' }]);
 });
