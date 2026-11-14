@@ -628,7 +628,7 @@ export default function App() {
   const currentSysStep = activeSysScenario.steps[boundedSysStepIdx];
 
   return (
-    <div className="min-h-screen flex flex-col bg-[#FAFAFA] text-neutral-900 dark:bg-[#0A0A0A] dark:text-neutral-100">
+    <div className={`flex flex-col bg-[#FAFAFA] text-neutral-900 dark:bg-[#0A0A0A] dark:text-neutral-100 ${activeTab === 'visualizer' ? 'min-h-screen lg:h-screen lg:overflow-hidden' : 'min-h-screen'}`}>
       {/* Strict 3-Zone Top Bar */}
       <header className="flex items-center justify-between gap-3 sm:gap-8 px-4 sm:px-6 py-3.5 border-b border-neutral-200 dark:border-neutral-800 bg-white dark:bg-[#111111] sticky top-0 z-30">
         {/* Zone 1: Single text element wordmark */}
@@ -707,9 +707,9 @@ export default function App() {
       </header>
 
       {/* Main Content Container */}
-      <main className="flex-1 max-w-[1440px] w-full mx-auto px-4 sm:px-6 py-6 overflow-x-hidden">
+      <main className={`flex-1 max-w-[1440px] w-full mx-auto px-4 sm:px-6 ${activeTab === 'visualizer' ? 'py-4 lg:py-3 lg:min-h-0 lg:overflow-hidden flex flex-col' : 'py-6 overflow-x-hidden'}`}>
         {activeTab === 'visualizer' && (
-          <div className="space-y-4" data-testid="visualizer-studio-view">
+          <div className="space-y-4 lg:space-y-0 lg:gap-3 lg:flex lg:flex-col lg:flex-1 lg:min-h-0" data-testid="visualizer-studio-view">
             {/* Sleek Breadcrumb & Command Bar (Saves ~120px vertical space above the fold) */}
             <div className="rounded-xl border border-neutral-200/80 dark:border-neutral-800/80 bg-white dark:bg-[#111111] px-4 py-2.5 shadow-[0_1px_3px_rgba(0,0,0,0.04)] flex flex-wrap items-center justify-between gap-3">
               {/* Left Breadcrumb: Topic Dropdown / Question Dropdown */}
@@ -869,7 +869,7 @@ export default function App() {
             {/* Sound Engineering & DSP Sonification Rack (Expandable) */}
             {showDspConsole && (
               <div
-                className="rounded-lg border border-neutral-300 dark:border-neutral-700 bg-white dark:bg-[#111111] p-4 space-y-4"
+                className="rounded-lg border border-neutral-300 dark:border-neutral-700 bg-white dark:bg-[#111111] p-4 space-y-4 lg:shrink-0 lg:max-h-[38vh] lg:overflow-y-auto"
                 data-testid="dsp-sound-console"
               >
                 <div className="flex flex-wrap items-center justify-between gap-2 pb-3 border-b border-neutral-200 dark:border-neutral-800">
@@ -1069,7 +1069,7 @@ export default function App() {
 
             {/* Step Bookmarks & Personal Notes Drawer */}
             {showBookmarksPanel && (
-              <div className="rounded-lg border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-[#111111] p-4 space-y-3">
+              <div className="rounded-lg border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-[#111111] p-4 space-y-3 lg:shrink-0 lg:max-h-[38vh] lg:overflow-y-auto">
                 <div className="flex flex-wrap items-center justify-between gap-2 pb-2 border-b border-neutral-200 dark:border-neutral-800">
                   <div className="text-xs font-mono font-semibold text-neutral-950 dark:text-white">
                     BOOKMARKED EXECUTION STEPS & PERSONAL INVARIANT NOTES ({bookmarks.length})
@@ -1141,9 +1141,9 @@ export default function App() {
             )}
 
             {/* Two-Zone Layout: Left Code & Spec (5 cols) | Right Manual Step Controller & Memory Stage (7 cols) */}
-            <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 lg:gap-5 items-start lg:items-stretch lg:flex-1 lg:min-h-0 lg:grid-rows-[minmax(0,1fr)]">
               {/* Left Column: Problem Spec, Spaced Repetition Bar & Interactive Code Editor */}
-              <div className="lg:col-span-5 space-y-5">
+              <div className="lg:col-span-5 space-y-4 lg:min-h-0 lg:overflow-y-auto lg:pr-1">
                 <div className="rounded-lg border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-[#111111] p-5 space-y-3">
                   <div className="flex items-center justify-between gap-2 text-xs font-mono text-neutral-500 dark:text-neutral-400">
                     <span>
@@ -1239,7 +1239,7 @@ export default function App() {
               </div>
 
               {/* Right Column: Step Intuition, Active Recall, Complexity Diff & Hero Memory Canvas */}
-              <div className="lg:col-span-7 space-y-4">
+              <div className="lg:col-span-7 space-y-3 lg:min-h-0 lg:overflow-y-auto lg:pr-1">
                 <div className="rounded-xl border border-neutral-200/80 dark:border-neutral-800/80 bg-white dark:bg-[#111111] p-4 shadow-[0_1px_3px_rgba(0,0,0,0.04)] space-y-3">
                   <div className="flex flex-wrap items-center justify-between gap-2 pb-2.5 border-b border-neutral-100 dark:border-neutral-800/80">
                     <div className="flex items-center gap-2">
@@ -1431,6 +1431,17 @@ export default function App() {
                     </div>
                   )}
 
+                {/* Dynamic Memory Allocation, Pointer Canvas & Recursion Call-Tree Flamegraph */}
+                <MemoryCanvas
+                  problemId={currentProblem.traceFamilyId || currentProblem.id}
+                  step={currentStep}
+                  totalSteps={steps.length}
+                  onSelectStep={(idx) => setStepIndex(idx)}
+                  recursionTree={recursionTree}
+                  predictModeActive={predictModeActive}
+                  onCellClick={handleCellClickInCanvas}
+                />
+
                   {/* Side-by-Side Brute-Force vs Optimal ("Diff Mode") Panel */}
                   {showComplexityDiff && (
                     <div className="p-4 rounded-md border border-neutral-300 dark:border-neutral-700 bg-neutral-50 dark:bg-neutral-900/90 space-y-3">
@@ -1495,17 +1506,6 @@ export default function App() {
                     setCustomSteps(null);
                     setStepIndex(0);
                   }}
-                />
-
-                {/* Dynamic Memory Allocation, Pointer Canvas & Recursion Call-Tree Flamegraph */}
-                <MemoryCanvas
-                  problemId={currentProblem.traceFamilyId || currentProblem.id}
-                  step={currentStep}
-                  totalSteps={steps.length}
-                  onSelectStep={(idx) => setStepIndex(idx)}
-                  recursionTree={recursionTree}
-                  predictModeActive={predictModeActive}
-                  onCellClick={handleCellClickInCanvas}
                 />
               </div>
             </div>
