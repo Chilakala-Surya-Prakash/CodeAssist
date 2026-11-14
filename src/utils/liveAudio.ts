@@ -24,7 +24,7 @@ export function base64Pcm16ToFloat32(base64: string): Float32Array {
   for (let i = 0; i < binary.length; i++) {
     bytes[i] = binary.charCodeAt(i);
   }
-  const int16Array = new Int16Array(bytes.buffer);
+  const int16Array = new Int16Array(bytes.buffer, 0, Math.floor(bytes.byteLength / 2));
   const float32Array = new Float32Array(int16Array.length);
   for (let i = 0; i < int16Array.length; i++) {
     float32Array[i] = int16Array[i] / 32768.0;

@@ -1,5 +1,6 @@
 import 'dotenv/config';
 import express from 'express';
+import rateLimit from 'express-rate-limit';
 import http from 'http';
 import path from 'path';
 import { fileURLToPath } from 'url';
@@ -12,6 +13,19 @@ import {
   Modality,
   Type,
 } from '@google/genai';
+import {
+  CHAT_SYSTEM_INSTRUCTION,
+  LIMITS,
+  MODELS,
+  TRACE_RESPONSE_SCHEMA,
+  buildChatPrompt,
+  buildTracePrompt,
+  isAllowedOrigin,
+  parseChatBody,
+  parseTraceBody,
+  parseTraceSteps,
+  sendTutorError,
+} from './lib/tutor.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -35,12 +49,7 @@ async function generateWithFallback(
   ai: GoogleGenAI,
   params: { contents: string; config?: Record<string, any> }
 ) {
-  const candidateModels = [
-    'gemini-flash-lite-latest',
-    'gemini-flash-latest',
-    'gemini-3.8-flash',
-    'gemini-3.1-flash-lite',
-  ];
+  const candidateModels = MODELS;
   let lastError: any = null;
 
   for (const model of candidateModels) {
@@ -94,7 +103,19 @@ async function startServer() {
   const server = http.createServer(app);
   const PORT = Number(process.env.PORT) || 3000;
 
-  app.use(express.json({ limit: '1mb' }));
+  // Set TRUST_PROXY=1 behind one reverse proxy (Cloud Run, Render, nginx) so req.ip is the real client.
+  app.set('trust proxy', Number(process.env.TRUST_PROXY) || 0);
+  app.use(express.json({ limit: '64kb' }));
+  app.use(
+    '/api/tutor',
+    rateLimit({
+      windowMs: 60_000,
+      limit: Number(process.env.TUTOR_RATE_LIMIT) || 20,
+      standardHeaders: true,
+      legacyHeaders: false,
+      message: { error: 'Too many requests. Please slow down.' },
+    })
+  );
 
   // 0. Production Health Check Endpoint
   app.get('/api/health', (_req, res) => {
@@ -109,178 +130,78 @@ async function startServer() {
   // 1. Real-time Personalized AI Tutor Endpoint (Text Chat)
   app.post('/api/tutor/chat', async (req, res) => {
     try {
-      const { message, problemTitle, language, code, currentStep, history } = req.body;
-
-      if (!message || typeof message !== 'string') {
-        res.status(400).json({ error: 'Message is required.' });
+      const parsed = parseChatBody(req.body);
+      if ('error' in parsed) {
+        res.status(400).json({ error: parsed.error });
         return;
       }
-
       const ai = getGenAIClient();
-      const stepSummary = currentStep
-        ? `Current Execution Step #${currentStep.stepIndex + 1}: "${currentStep.title}"
-Operation: ${currentStep.operationType}
-Active Line (${language}): ${language === 'python' ? currentStep.pythonLine : currentStep.javaLine}
-Intuition: ${currentStep.intuition}
-Memory Mutation: ${currentStep.memoryMutation}
-Invariant: ${currentStep.invariantCheck}
-Stack Variables: ${JSON.stringify(currentStep.stackFrames?.[0]?.variables || [])}
-Pointers: ${JSON.stringify(currentStep.pointers || [])}`
-        : 'No step context provided.';
-
-      const recentHistory = Array.isArray(history)
-        ? history
-            .slice(-6)
-            .map((m: { role: string; content: string }) => `${m.role.toUpperCase()}: ${m.content}`)
-            .join('\n\n')
-        : '';
-
-      const prompt = `Context:
-Problem: ${problemTitle || 'Algorithmic Problem'}
-Active Language: ${language ? language.toUpperCase() : 'PYTHON'}
-Current Code in Editor:
-\`\`\`${language || 'python'}
-${code || ''}
-\`\`\`
-
-Live Memory & Pointer State at Current Step:
-${stepSummary}
-
-${recentHistory ? `Recent Conversation:\n${recentHistory}\n\n` : ''}Student Question:
-${message}`;
-
       const response = await generateWithFallback(ai, {
-        contents: prompt,
-        config: {
-          systemInstruction:
-            'You are the Principal Staff Algorithms & Systems Mentor on TraceCraft. Explain memory allocation (stack frames vs heap objects), pointer movements, loop invariants, and time/space complexity with crystalline precision. Keep responses concise (120-220 words), structured with short bullet points or inline code references, and reference the exact heap addresses, pointers, and line numbers from the active execution step.',
-        },
+        contents: buildChatPrompt(parsed.value),
+        config: { systemInstruction: CHAT_SYSTEM_INSTRUCTION },
       });
-
-      res.json({
-        reply: response.text || 'Unable to generate response.',
-      });
+      res.json({ reply: response.text || 'Unable to generate response.' });
     } catch (error: any) {
-      console.error('Gemini /api/tutor/chat error:', error?.message || error);
-      const status = error?.status || 500;
-      res.status(status).json({
-        error:
-          error?.message ||
-          'Failed to reach Gemini AI Tutor. Check your GEMINI_API_KEY in Settings > Secrets.',
-      });
+      sendTutorError(res, error, 'Gemini /api/tutor/chat');
     }
   });
 
   // 2. Dynamic Custom Code Memory & Pointer Trace Generator via Gemini Structured JSON
   app.post('/api/tutor/trace', async (req, res) => {
     try {
-      const { code, language, customInput, problemTitle } = req.body;
-      if (!code || typeof code !== 'string') {
-        res.status(400).json({ error: 'Code is required to generate a custom trace.' });
+      const parsed = parseTraceBody(req.body);
+      if ('error' in parsed) {
+        res.status(400).json({ error: parsed.error });
         return;
       }
-      if (code.length > 8000) {
-        res.status(400).json({ error: 'Code too long (max 8000 characters). Paste only the core algorithm.' });
-        return;
-      }
-
       const ai = getGenAIClient();
       const response = await generateWithFallback(ai, {
-        contents: `Trace the execution of the following ${language || 'Python'} code step-by-step on input "${customInput || 'default'}".
-Problem: ${problemTitle || 'Custom Algorithm'}
-Code:
-${code}
-
-Generate between 4 and 8 key execution steps showing how stack variables, heap objects (with realistic hex addresses like 0x1040, 0x1080), and pointers (like left, right, curr, prev, mid, slow, fast) evolve dynamically.`,
-        config: {
-          responseMimeType: 'application/json',
-          responseSchema: {
-            type: Type.ARRAY,
-            items: {
-              type: Type.OBJECT,
-              properties: {
-                stepIndex: { type: Type.INTEGER },
-                title: { type: Type.STRING },
-                pythonLine: { type: Type.INTEGER },
-                javaLine: { type: Type.INTEGER },
-                operationType: { type: Type.STRING },
-                intuition: { type: Type.STRING },
-                memoryMutation: { type: Type.STRING },
-                invariantCheck: { type: Type.STRING },
-                stdout: { type: Type.STRING },
-                stackVariables: {
-                  type: Type.ARRAY,
-                  items: {
-                    type: Type.OBJECT,
-                    properties: {
-                      name: { type: Type.STRING },
-                      value: { type: Type.STRING },
-                      type: { type: Type.STRING },
-                      address: { type: Type.STRING },
-                      isPointer: { type: Type.BOOLEAN },
-                    },
-                  },
-                },
-                heapCells: {
-                  type: Type.ARRAY,
-                  items: {
-                    type: Type.OBJECT,
-                    properties: {
-                      index: { type: Type.STRING },
-                      label: { type: Type.STRING },
-                      value: { type: Type.STRING },
-                      addressOffset: { type: Type.STRING },
-                      nextAddress: { type: Type.STRING },
-                      status: { type: Type.STRING },
-                      annotation: { type: Type.STRING },
-                    },
-                  },
-                },
-                pointers: {
-                  type: Type.ARRAY,
-                  items: {
-                    type: Type.OBJECT,
-                    properties: {
-                      name: { type: Type.STRING },
-                      targetIndex: { type: Type.STRING },
-                      targetAddress: { type: Type.STRING },
-                      deltaDescription: { type: Type.STRING },
-                    },
-                  },
-                },
-              },
-            },
-          },
-        },
+        contents: buildTracePrompt(parsed.value),
+        config: { responseMimeType: 'application/json', responseSchema: TRACE_RESPONSE_SCHEMA },
       });
-
-      let textPayload = (response.text ?? '[]').trim();
-      if (textPayload.startsWith('```')) {
-        textPayload = textPayload.replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/, '').trim();
-      }
-      const rawSteps = JSON.parse(textPayload || '[]');
-      res.json({ steps: rawSteps });
+      res.json({ steps: parseTraceSteps(response.text ?? '[]') });
     } catch (error: any) {
-      console.error('Gemini /api/tutor/trace error:', error?.message || error);
-      const status = error?.status || 500;
-      res.status(status).json({
-        error:
-          error?.message ||
-          'Failed to generate custom Gemini trace. Check your GEMINI_API_KEY in Settings > Secrets.',
-      });
+      sendTutorError(res, error, 'Gemini /api/tutor/trace');
     }
   });
 
   // 3. Gemini Live API WebSocket Bridge (/api/live) for Real-Time Voice Mode + Screen Sync
-  const wss = new WebSocketServer({ noServer: true });
+  const wss = new WebSocketServer({ noServer: true, maxPayload: 256 * 1024 });
+  const MAX_LIVE_TOTAL = Number(process.env.LIVE_MAX_CONNECTIONS) || 50;
+  const MAX_LIVE_PER_IP = Number(process.env.LIVE_MAX_PER_IP) || 2;
+  const liveByIp = new Map<string, number>();
 
   server.on('upgrade', (request, socket, head) => {
-    const pathname = new URL(request.url || '/', `http://${request.headers.host}`).pathname;
-    if (pathname === '/api/live') {
-      wss.handleUpgrade(request, socket, head, (ws) => {
-        wss.emit('connection', ws, request);
-      });
+    const reject = (code: number, text: string) => {
+      socket.write(`HTTP/1.1 ${code} ${text}\r\nConnection: close\r\n\r\n`);
+      socket.destroy();
+    };
+    let pathname = '';
+    try {
+      pathname = new URL(request.url || '/', 'http://localhost').pathname;
+    } catch {
+      return reject(400, 'Bad Request');
     }
+    if (pathname !== '/api/live') {
+      // In dev, Vite's own upgrade handling is not affected (it runs on a separate HMR port).
+      return reject(404, 'Not Found');
+    }
+    if (!isAllowedOrigin(request.headers.origin, request.headers.host, process.env.ALLOWED_ORIGINS)) {
+      return reject(403, 'Forbidden');
+    }
+    const ip = request.socket.remoteAddress || 'unknown';
+    if (wss.clients.size >= MAX_LIVE_TOTAL || (liveByIp.get(ip) || 0) >= MAX_LIVE_PER_IP) {
+      return reject(429, 'Too Many Requests');
+    }
+    liveByIp.set(ip, (liveByIp.get(ip) || 0) + 1);
+    wss.handleUpgrade(request, socket, head, (ws) => {
+      ws.on('close', () => {
+        const n = (liveByIp.get(ip) || 1) - 1;
+        if (n <= 0) liveByIp.delete(ip);
+        else liveByIp.set(ip, n);
+      });
+      wss.emit('connection', ws, request);
+    });
   });
 
   wss.on('connection', (clientWs: WebSocket) => {
@@ -308,7 +229,7 @@ Generate between 4 and 8 key execution steps showing how stack variables, heap o
           tools: [{ functionDeclarations: [syncVisualizerStepTool] }],
           systemInstruction:
             'You are the Live Voice Algorithms Mentor on TraceCraft. You speak directly with the engineer while they watch the interactive Memory & Pointer Visualization on screen. Explain pointer changes, heap allocations, and stack frames naturally and concisely. You can call syncVisualizerStep(action="next" | "prev" | "goto", stepIndex) to step the visualization on their screen as you narrate each transition. ' +
-            (initialContext || ''),
+            (typeof initialContext === 'string' ? initialContext.slice(0, LIMITS.liveContext) : ''),
         },
         callbacks: {
           onmessage: (message: LiveServerMessage) => {

@@ -1,22 +1,45 @@
-import { GoogleGenAI } from '@google/genai';
+import { GoogleGenAI,  } from '@google/genai';
 import type { VercelRequest, VercelResponse } from '@vercel/node';
+import {
+  CHAT_SYSTEM_INSTRUCTION,
+  MODELS,
+  buildChatPrompt,
+  parseChatBody,
+  sendTutorError,
+} from '../../lib/tutor.js';
+
+// NOTE: serverless instances don't share memory, so in-process rate limiting is ineffective here.
+// Enable Vercel WAF rate limiting (or Upstash Ratelimit) on /api/tutor/* for production.
 
 function getGenAIClient(): GoogleGenAI {
   const apiKey = process.env.GEMINI_API_KEY;
   if (!apiKey) {
-    throw Object.assign(
-      new Error('GEMINI_API_KEY is not set. Add it to your Vercel Project Environment Variables.'),
-      { status: 503 }
-    );
+    throw Object.assign(new Error('GEMINI_API_KEY is not set.'), { status: 503 });
   }
-  return new GoogleGenAI({
-    apiKey,
-    httpOptions: {
-      headers: {
-        'User-Agent': 'aistudio-build',
-      },
-    },
-  });
+  return new GoogleGenAI({ apiKey, httpOptions: { headers: { 'User-Agent': 'aistudio-build' } } });
+}
+
+async function generateWithFallback(ai: GoogleGenAI, params: { contents: string; config?: Record<string, any> }) {
+  let lastError: any = null;
+  for (const model of MODELS) {
+    try {
+      return await ai.models.generateContent({ model, contents: params.contents, config: params.config });
+    } catch (err: any) {
+      lastError = err;
+      const status = err?.status || err?.code;
+      if (status === 503 || status === 429 || status === 404) continue;
+      throw err;
+    }
+  }
+  throw lastError;
+}
+
+function readBody(req: VercelRequest): unknown {
+  try {
+    return typeof req.body === 'string' ? JSON.parse(req.body) : req.body || {};
+  } catch {
+    return null;
+  }
 }
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
@@ -24,103 +47,18 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     res.status(405).json({ error: 'Method not allowed. Use POST.' });
     return;
   }
-
   try {
-    const body = typeof req.body === 'string' ? JSON.parse(req.body) : req.body || {};
-    const { message, problemTitle, language, code, currentStep, history } = body;
-
-    if (!message || typeof message !== 'string') {
-      res.status(400).json({ error: 'Message is required.' });
+    const parsed = parseChatBody(readBody(req));
+    if ('error' in parsed) {
+      res.status(400).json({ error: parsed.error });
       return;
     }
-    if (message.length > 2000) {
-      res.status(400).json({ error: 'Message too long (max 2000 characters).' });
-      return;
-    }
-
-    const ai = getGenAIClient();
-    const stepSummary = currentStep
-      ? `Current Execution Step #${currentStep.stepIndex + 1}: "${currentStep.title}"
-Operation: ${currentStep.operationType}
-Active Line (${language}): ${language === 'python' ? currentStep.pythonLine : currentStep.javaLine}
-Intuition: ${currentStep.intuition}
-Memory Mutation: ${currentStep.memoryMutation}
-Invariant: ${currentStep.invariantCheck}
-Stack Variables: ${JSON.stringify(currentStep.stackFrames?.[0]?.variables || [])}
-Pointers: ${JSON.stringify(currentStep.pointers || [])}`
-      : 'No step context provided.';
-
-    const recentHistory = Array.isArray(history)
-      ? history
-          .slice(-6)
-          .map((m: { role: string; content: string }) => `${m.role.toUpperCase()}: ${m.content}`)
-          .join('\n\n')
-      : '';
-
-    const prompt = `Context:
-Problem: ${problemTitle || 'Algorithmic Problem'}
-Active Language: ${language ? language.toUpperCase() : 'PYTHON'}
-Current Code in Editor:
-\`\`\`${language || 'python'}
-${code || ''}
-\`\`\`
-
-Live Memory & Pointer State at Current Step:
-${stepSummary}
-
-${recentHistory ? `Recent Conversation:\n${recentHistory}\n\n` : ''}Student Question:
-${message}`;
-
-    const candidateModels = [
-      'gemini-flash-lite-latest',
-      'gemini-flash-latest',
-      'gemini-3.8-flash',
-      'gemini-3.1-flash-lite',
-    ];
-    let response: any = null;
-    let lastError: any = null;
-
-    for (const model of candidateModels) {
-      try {
-        response = await ai.models.generateContent({
-          model,
-          contents: prompt,
-          config: {
-            systemInstruction:
-              'You are the Principal Staff Algorithms & Systems Mentor on TraceCraft. Explain memory allocation (stack frames vs heap objects), pointer movements, loop invariants, and time/space complexity with crystalline precision. Keep responses concise (120-220 words), structured with short bullet points or inline code references, and reference the exact heap addresses, pointers, and line numbers from the active execution step.',
-          },
-        });
-        break;
-      } catch (err: any) {
-        lastError = err;
-        const status = err?.status || err?.code;
-        if (
-          status === 503 ||
-          status === 429 ||
-          status === 404 ||
-          String(err?.message || '').includes('503') ||
-          String(err?.message || '').includes('404')
-        ) {
-          continue;
-        }
-        throw err;
-      }
-    }
-
-    if (!response) {
-      throw lastError;
-    }
-
-    res.status(200).json({
-      reply: response.text || 'Unable to generate response.',
+    const response = await generateWithFallback(getGenAIClient(), {
+      contents: buildChatPrompt(parsed.value),
+      config: { systemInstruction: CHAT_SYSTEM_INSTRUCTION },
     });
+    res.status(200).json({ reply: response.text || 'Unable to generate response.' });
   } catch (error: any) {
-    console.error('Vercel /api/tutor/chat error:', error?.message || error);
-    const status = error?.status || 500;
-    res.status(status).json({
-      error:
-        error?.message ||
-        'Failed to reach Gemini AI Tutor. Verify GEMINI_API_KEY in your environment variables.',
-    });
+    sendTutorError(res, error, 'Vercel /api/tutor/chat');
   }
 }
