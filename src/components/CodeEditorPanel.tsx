@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { AlgorithmProblem, ExecutionStep, Language } from '../types/visualizer';
 import {
   getBugChallenge,
@@ -6,7 +6,7 @@ import {
   LocalTestCaseResult,
   runLocalTestSuite,
 } from '../utils/zeroCostEngines';
-import { Bug, Check, ChevronLeft, ChevronRight, Play, RotateCcw, Sparkles, Terminal, X } from 'lucide-react';
+import { BookOpen, Bug, Check, ChevronLeft, ChevronRight, Play, RotateCcw, Sparkles, Terminal, X } from 'lucide-react';
 
 interface CodeEditorPanelProps {
   problem: AlgorithmProblem;
@@ -24,6 +24,15 @@ interface CodeEditorPanelProps {
   stepIndex?: number;
   totalSteps?: number;
   onStepCommand?: (action: 'next' | 'prev' | 'reset' | 'goto', stepIndex?: number) => void;
+}
+
+type LineExplanations = Record<number, string>;
+
+// Small stable hash so explanations can be cached per code version in localStorage
+function hashCode(str: string): string {
+  let h = 5381;
+  for (let i = 0; i < str.length; i++) h = ((h << 5) + h + str.charCodeAt(i)) | 0;
+  return (h >>> 0).toString(36);
 }
 
 const ALL_LANGUAGES: Language[] = ['python', 'java', 'cpp', 'go', 'typescript', 'rust'];
@@ -51,7 +60,51 @@ export const CodeEditorPanel: React.FC<CodeEditorPanelProps> = ({
   const [testSuiteResults, setTestSuiteResults] = useState<LocalTestCaseResult[] | null>(null);
   const [autoLoadedFailLabel, setAutoLoadedFailLabel] = useState<string | null>(null);
 
+  const [pinnedLine, setPinnedLine] = useState<number | null>(null);
+  const [explanations, setExplanations] = useState<LineExplanations | null>(null);
+  const [isExplaining, setIsExplaining] = useState(false);
+  const [explainError, setExplainError] = useState<string | null>(null);
+
   const lines = code.split('\n');
+  const explainKey = `tracecraft-explain-${language}-${hashCode(code)}`;
+
+  // Load cached explanations for this exact code; reset when code, language or problem changes
+  useEffect(() => {
+    setPinnedLine(null);
+    setExplainError(null);
+    try {
+      const saved = window.localStorage.getItem(explainKey);
+      setExplanations(saved ? (JSON.parse(saved) as LineExplanations) : null);
+    } catch {
+      setExplanations(null);
+    }
+  }, [explainKey, problem.id]);
+
+  const handleExplainLines = async () => {
+    setIsExplaining(true);
+    setExplainError(null);
+    try {
+      const res = await fetch('/api/tutor/explain', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ code, language, problemTitle: problem.title }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Could not explain the code.');
+      const map: LineExplanations = {};
+      for (const l of data.lines || []) map[l.line] = l.text;
+      setExplanations(map);
+      try {
+        window.localStorage.setItem(explainKey, JSON.stringify(map));
+      } catch {
+        // storage full or unavailable: explanations still work for this session
+      }
+    } catch (err: any) {
+      setExplainError(err?.message || 'Could not explain the code.');
+    } finally {
+      setIsExplaining(false);
+    }
+  };
   const activeLine =
     language === 'python'
       ? currentStep.pythonLine
@@ -207,6 +260,16 @@ export const CodeEditorPanel: React.FC<CodeEditorPanelProps> = ({
             </button>
             <button
               type="button"
+              onClick={handleExplainLines}
+              disabled={isExplaining}
+              title="Ask the AI mentor to explain every line"
+              className="px-2.5 py-1 text-xs font-medium rounded-md border border-neutral-300 dark:border-neutral-700 text-neutral-700 dark:text-neutral-300 hover:bg-neutral-100 dark:hover:bg-neutral-800 transition-colors flex items-center gap-1 whitespace-nowrap shrink-0 disabled:opacity-60"
+            >
+              <BookOpen className="w-3.5 h-3.5" />
+              {isExplaining ? 'Explaining...' : explanations ? 'Re-explain lines' : 'Explain lines'}
+            </button>
+            <button
+              type="button"
               onClick={() => setIsEditingCode(!isEditingCode)}
               className="px-2.5 py-1 text-xs font-medium text-neutral-700 dark:text-neutral-300 border border-neutral-300 dark:border-neutral-700 rounded-md hover:bg-neutral-100 dark:hover:bg-neutral-800 transition-colors whitespace-nowrap shrink-0"
             >
@@ -297,20 +360,31 @@ export const CodeEditorPanel: React.FC<CodeEditorPanelProps> = ({
               return (
                 <div
                   key={lineNumber}
-                  onClick={() => toggleBreakpoint(lineNumber)}
+                  onClick={() => setPinnedLine((p) => (p === lineNumber ? null : lineNumber))}
                   className={`flex items-center px-3 cursor-pointer select-none transition-colors ${
                     isCurrent
                       ? 'bg-blue-500/10 dark:bg-blue-500/15 text-neutral-950 dark:text-white font-semibold'
+                      : pinnedLine === lineNumber
+                      ? 'bg-amber-500/10 dark:bg-amber-400/10 text-neutral-950 dark:text-white'
                       : 'hover:bg-neutral-100 dark:hover:bg-neutral-900 text-neutral-700 dark:text-neutral-300'
                   }`}
                 >
-                  <div className="w-12 shrink-0 flex items-center justify-between pr-3 text-neutral-400 dark:text-neutral-500 tabular-nums">
-                    <span className="w-3 text-[10px] text-blue-600 dark:text-blue-400 font-bold">
+                  <div
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      toggleBreakpoint(lineNumber);
+                    }}
+                    title="Click to toggle breakpoint"
+                    className="w-12 shrink-0 flex items-center justify-between pr-3 text-neutral-400 dark:text-neutral-500 tabular-nums">
+                    <span className="w-3 text-[11px] text-blue-600 dark:text-blue-400 font-bold">
                       {isCurrent ? '▶' : hasBp ? '●' : ''}
                     </span>
                     <span>{lineNumber}</span>
                   </div>
                   <pre className="whitespace-pre font-mono">{lineText || ' '}</pre>
+                  {explanations?.[lineNumber] && !isCurrent && (
+                    <span aria-hidden="true" className="ml-2 text-[11px] text-amber-500/80 select-none">•</span>
+                  )}
 
                   {/* Line-Level Micro-Indicator: Inline Ghost Value */}
                   {isCurrent && inlineGhost && (
@@ -324,6 +398,82 @@ export const CodeEditorPanel: React.FC<CodeEditorPanelProps> = ({
           </div>
         </div>
       )}
+
+      {/* Line Explainer: follows the running line, or the line the learner pinned */}
+      {!isEditingCode && (() => {
+        const shown = pinnedLine ?? activeLine;
+        const text = lines[shown - 1] ?? '';
+        const aiText = explanations?.[shown];
+        return (
+          <div
+            className="px-4 py-3 border-t border-neutral-100 dark:border-neutral-800/80 bg-neutral-50/80 dark:bg-neutral-900/40 space-y-1.5"
+            role="region"
+            aria-label="Line explanation"
+          >
+            <div className="flex flex-wrap items-center justify-between gap-2 text-xs font-mono">
+              <span className="font-bold text-neutral-950 dark:text-neutral-100">
+                Line {shown}
+                <span className="ml-2 font-normal text-neutral-500">
+                  {pinnedLine ? 'pinned' : 'following execution'}
+                </span>
+              </span>
+              <span className="flex items-center gap-1">
+                <button
+                  type="button"
+                  aria-label="Previous line"
+                  onClick={() => setPinnedLine(Math.max(1, shown - 1))}
+                  disabled={shown <= 1}
+                  className="p-1 rounded border border-neutral-300 dark:border-neutral-700 disabled:opacity-40"
+                >
+                  <ChevronLeft className="w-3.5 h-3.5" />
+                </button>
+                <button
+                  type="button"
+                  aria-label="Next line"
+                  onClick={() => setPinnedLine(Math.min(lines.length, shown + 1))}
+                  disabled={shown >= lines.length}
+                  className="p-1 rounded border border-neutral-300 dark:border-neutral-700 disabled:opacity-40"
+                >
+                  <ChevronRight className="w-3.5 h-3.5" />
+                </button>
+                {pinnedLine && (
+                  <button
+                    type="button"
+                    onClick={() => setPinnedLine(null)}
+                    className="px-2 py-1 rounded border border-neutral-300 dark:border-neutral-700 text-xs"
+                  >
+                    Follow
+                  </button>
+                )}
+              </span>
+            </div>
+            <code className="block text-xs font-mono text-neutral-700 dark:text-neutral-300 truncate">
+              {text.trim() || '(blank line)'}
+            </code>
+            {aiText ? (
+              <p className="text-xs sm:text-sm text-neutral-800 dark:text-neutral-200 leading-relaxed">{aiText}</p>
+            ) : (
+              <p className="text-xs sm:text-sm text-neutral-600 dark:text-neutral-400 leading-relaxed">
+                {shown === activeLine
+                  ? currentStep.intuition
+                  : explanations
+                  ? 'Nothing to explain on this line.'
+                  : 'Press "Explain lines" to get a plain-English explanation of every line.'}
+              </p>
+            )}
+            {shown === activeLine && aiText && (
+              <p className="text-xs text-neutral-500 dark:text-neutral-400 leading-relaxed">
+                This step: {currentStep.memoryMutation}
+              </p>
+            )}
+            {explainError && (
+              <p role="alert" className="text-xs text-red-600 dark:text-red-400">
+                {explainError}
+              </p>
+            )}
+          </div>
+        );
+      })()}
 
       {/* Complexity & 16-Case Test Runner Strip */}
       <div className="px-4 py-2.5 border-t border-neutral-100 dark:border-neutral-800/80 bg-neutral-50/80 dark:bg-neutral-900/40 flex flex-wrap items-center justify-between gap-2 text-xs">

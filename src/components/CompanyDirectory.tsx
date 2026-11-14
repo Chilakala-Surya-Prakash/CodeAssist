@@ -496,7 +496,7 @@ export const CompanyDirectory: React.FC<CompanyDirectoryProps> = ({
                                 {roundType}
                               </span>
                               {isFeatured && (
-                                <span className="px-1.5 py-0.2 rounded text-[10px] bg-indigo-100 dark:bg-indigo-950 text-indigo-700 dark:text-indigo-300 font-semibold">
+                                <span className="px-1.5 py-0.2 rounded text-[11px] bg-indigo-100 dark:bg-indigo-950 text-indigo-700 dark:text-indigo-300 font-semibold">
                                   Top Pick
                                 </span>
                               )}

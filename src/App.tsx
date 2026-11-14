@@ -57,6 +57,8 @@ import {
   Moon,
   RotateCcw,
   Scale,
+  Pause,
+  Play,
   Server,
   Share2,
   Sliders,
@@ -313,6 +315,43 @@ export default function App() {
   const steps = customSteps && customSteps.length > 0 ? customSteps : deterministicSteps;
   const boundedStepIndex = Math.min(stepIndex, Math.max(0, steps.length - 1));
   const currentStep = steps[boundedStepIndex] || steps[0];
+
+  // Autoplay: advance one step per tick; stop at the last step
+  const [isPlaying, setIsPlaying] = useState<boolean>(false);
+  const [playDelayMs, setPlayDelayMs] = useState<number>(1600);
+
+  useEffect(() => {
+    if (!isPlaying) return;
+    if (boundedStepIndex >= steps.length - 1) {
+      setIsPlaying(false);
+      return;
+    }
+    const t = window.setTimeout(() => setStepIndex((i) => Math.min(steps.length - 1, i + 1)), playDelayMs);
+    return () => window.clearTimeout(t);
+  }, [isPlaying, boundedStepIndex, steps.length, playDelayMs]);
+
+  // Stop playback when the problem or trace changes
+  useEffect(() => {
+    setIsPlaying(false);
+  }, [currentProblem.id, customSteps]);
+
+  // Keyboard stepping: ← → Home End, Space toggles play (ignored while typing)
+  useEffect(() => {
+    if (activeTab !== 'visualizer') return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.metaKey || e.ctrlKey || e.altKey) return;
+      const el = e.target as HTMLElement | null;
+      const tag = el?.tagName;
+      if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT' || el?.isContentEditable) return;
+      if (e.key === 'ArrowRight') { e.preventDefault(); setStepIndex((i) => Math.min(steps.length - 1, i + 1)); }
+      else if (e.key === 'ArrowLeft') { e.preventDefault(); setStepIndex((i) => Math.max(0, i - 1)); }
+      else if (e.key === 'Home') { e.preventDefault(); setStepIndex(0); }
+      else if (e.key === 'End') { e.preventDefault(); setStepIndex(steps.length - 1); }
+      else if (e.key === ' ' && tag !== 'BUTTON') { e.preventDefault(); setIsPlaying((p) => !p); }
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [activeTab, steps.length]);
 
   const complexityDiff = useMemo(
     () => computeComplexityDiff(currentProblem, steps, boundedStepIndex),
@@ -589,7 +628,7 @@ export default function App() {
   const currentSysStep = activeSysScenario.steps[boundedSysStepIdx];
 
   return (
-    <div className="min-h-screen flex flex-col bg-[#FAFAFA] text-neutral-900 dark:bg-[#0A0A0A] dark:text-neutral-100">
+    <div className={`flex flex-col bg-[#FAFAFA] text-neutral-900 dark:bg-[#0A0A0A] dark:text-neutral-100 ${activeTab === 'visualizer' ? 'min-h-screen lg:h-screen lg:overflow-hidden' : 'min-h-screen'}`}>
       {/* Strict 3-Zone Top Bar */}
       <header className="flex items-center justify-between gap-3 sm:gap-8 px-4 sm:px-6 py-3.5 border-b border-neutral-200 dark:border-neutral-800 bg-white dark:bg-[#111111] sticky top-0 z-30">
         {/* Zone 1: Single text element wordmark */}
@@ -668,9 +707,9 @@ export default function App() {
       </header>
 
       {/* Main Content Container */}
-      <main className="flex-1 max-w-[1440px] w-full mx-auto px-4 sm:px-6 py-6 overflow-x-hidden">
+      <main className={`flex-1 max-w-[1440px] w-full mx-auto px-4 sm:px-6 ${activeTab === 'visualizer' ? 'py-4 lg:py-3 lg:min-h-0 lg:overflow-hidden flex flex-col' : 'py-6 overflow-x-hidden'}`}>
         {activeTab === 'visualizer' && (
-          <div className="space-y-4" data-testid="visualizer-studio-view">
+          <div className="space-y-4 lg:space-y-0 lg:gap-3 lg:flex lg:flex-col lg:flex-1 lg:min-h-0" data-testid="visualizer-studio-view">
             {/* Sleek Breadcrumb & Command Bar (Saves ~120px vertical space above the fold) */}
             <div className="rounded-xl border border-neutral-200/80 dark:border-neutral-800/80 bg-white dark:bg-[#111111] px-4 py-2.5 shadow-[0_1px_3px_rgba(0,0,0,0.04)] flex flex-wrap items-center justify-between gap-3">
               {/* Left Breadcrumb: Topic Dropdown / Question Dropdown */}
@@ -694,7 +733,7 @@ export default function App() {
                       </option>
                     ))}
                   </select>
-                  <span className="pointer-events-none absolute right-2 text-[10px] text-neutral-400">▾</span>
+                  <span className="pointer-events-none absolute right-2 text-[11px] text-neutral-400">▾</span>
                 </div>
 
                 <span className="text-neutral-300 dark:text-neutral-700">/</span>
@@ -714,12 +753,12 @@ export default function App() {
                       </option>
                     ))}
                   </select>
-                  <span className="pointer-events-none absolute right-2 text-[10px] text-neutral-400">▾</span>
+                  <span className="pointer-events-none absolute right-2 text-[11px] text-neutral-400">▾</span>
                 </div>
 
                 {/* Difficulty Badge */}
                 <span
-                  className={`px-2 py-0.5 rounded text-[10px] font-mono font-bold uppercase tracking-wider ${
+                  className={`px-2 py-0.5 rounded text-[11px] font-mono font-bold uppercase tracking-wider ${
                     currentProblem.difficulty === 'Easy'
                       ? 'bg-emerald-50 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-400 border border-emerald-300/60 dark:border-emerald-800/60'
                       : currentProblem.difficulty === 'Medium'
@@ -830,7 +869,7 @@ export default function App() {
             {/* Sound Engineering & DSP Sonification Rack (Expandable) */}
             {showDspConsole && (
               <div
-                className="rounded-lg border border-neutral-300 dark:border-neutral-700 bg-white dark:bg-[#111111] p-4 space-y-4"
+                className="rounded-lg border border-neutral-300 dark:border-neutral-700 bg-white dark:bg-[#111111] p-4 space-y-4 lg:shrink-0 lg:max-h-[38vh] lg:overflow-y-auto"
                 data-testid="dsp-sound-console"
               >
                 <div className="flex flex-wrap items-center justify-between gap-2 pb-3 border-b border-neutral-200 dark:border-neutral-800">
@@ -1030,7 +1069,7 @@ export default function App() {
 
             {/* Step Bookmarks & Personal Notes Drawer */}
             {showBookmarksPanel && (
-              <div className="rounded-lg border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-[#111111] p-4 space-y-3">
+              <div className="rounded-lg border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-[#111111] p-4 space-y-3 lg:shrink-0 lg:max-h-[38vh] lg:overflow-y-auto">
                 <div className="flex flex-wrap items-center justify-between gap-2 pb-2 border-b border-neutral-200 dark:border-neutral-800">
                   <div className="text-xs font-mono font-semibold text-neutral-950 dark:text-white">
                     BOOKMARKED EXECUTION STEPS & PERSONAL INVARIANT NOTES ({bookmarks.length})
@@ -1102,9 +1141,9 @@ export default function App() {
             )}
 
             {/* Two-Zone Layout: Left Code & Spec (5 cols) | Right Manual Step Controller & Memory Stage (7 cols) */}
-            <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 lg:gap-5 items-start lg:items-stretch lg:flex-1 lg:min-h-0 lg:grid-rows-[minmax(0,1fr)]">
               {/* Left Column: Problem Spec, Spaced Repetition Bar & Interactive Code Editor */}
-              <div className="lg:col-span-5 space-y-5">
+              <div className="lg:col-span-5 space-y-4 lg:min-h-0 lg:overflow-y-auto lg:pr-1">
                 <div className="rounded-lg border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-[#111111] p-5 space-y-3">
                   <div className="flex items-center justify-between gap-2 text-xs font-mono text-neutral-500 dark:text-neutral-400">
                     <span>
@@ -1200,7 +1239,7 @@ export default function App() {
               </div>
 
               {/* Right Column: Step Intuition, Active Recall, Complexity Diff & Hero Memory Canvas */}
-              <div className="lg:col-span-7 space-y-4">
+              <div className="lg:col-span-7 space-y-3 lg:min-h-0 lg:overflow-y-auto lg:pr-1">
                 <div className="rounded-xl border border-neutral-200/80 dark:border-neutral-800/80 bg-white dark:bg-[#111111] p-4 shadow-[0_1px_3px_rgba(0,0,0,0.04)] space-y-3">
                   <div className="flex flex-wrap items-center justify-between gap-2 pb-2.5 border-b border-neutral-100 dark:border-neutral-800/80">
                     <div className="flex items-center gap-2">
@@ -1257,7 +1296,53 @@ export default function App() {
                     {currentStep.intuition}
                   </p>
 
-                  <div className="flex items-center gap-3 pt-2 border-t border-neutral-100 dark:border-neutral-800/80">
+                  <div className="sr-only-live" role="status" aria-live="polite" aria-atomic="true">
+                    Step {boundedStepIndex + 1} of {steps.length}: {currentStep.title}. {currentStep.intuition}
+                  </div>
+                  <div className="flex flex-wrap items-center gap-2 pt-2 border-t border-neutral-100 dark:border-neutral-800/80">
+                    <button
+                      type="button"
+                      onClick={() => setStepIndex((i) => Math.max(0, i - 1))}
+                      disabled={boundedStepIndex === 0}
+                      aria-label="Previous step"
+                      className="p-1.5 rounded-md border border-neutral-300 dark:border-neutral-700 text-neutral-700 dark:text-neutral-300 hover:bg-neutral-100 dark:hover:bg-neutral-900 disabled:opacity-40"
+                    >
+                      <ChevronLeft className="w-4 h-4" />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (boundedStepIndex >= steps.length - 1) setStepIndex(0);
+                        setIsPlaying((p) => !p);
+                      }}
+                      aria-label={isPlaying ? 'Pause autoplay' : 'Play steps automatically'}
+                      className="px-2.5 py-1.5 rounded-md bg-neutral-900 text-white dark:bg-neutral-100 dark:text-neutral-950 text-xs font-medium flex items-center gap-1"
+                    >
+                      {isPlaying ? <Pause className="w-3.5 h-3.5" /> : <Play className="w-3.5 h-3.5" />}
+                      {isPlaying ? 'Pause' : 'Play'}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setStepIndex((i) => Math.min(steps.length - 1, i + 1))}
+                      disabled={boundedStepIndex >= steps.length - 1}
+                      aria-label="Next step"
+                      className="p-1.5 rounded-md border border-neutral-300 dark:border-neutral-700 text-neutral-700 dark:text-neutral-300 hover:bg-neutral-100 dark:hover:bg-neutral-900 disabled:opacity-40"
+                    >
+                      <ChevronRight className="w-4 h-4" />
+                    </button>
+                    <select
+                      aria-label="Playback speed"
+                      value={playDelayMs}
+                      onChange={(e) => setPlayDelayMs(Number(e.target.value))}
+                      className="text-xs rounded-md border border-neutral-300 dark:border-neutral-700 bg-white dark:bg-neutral-900 text-neutral-800 dark:text-neutral-200 px-1.5 py-1.5"
+                    >
+                      <option value={2600}>0.5×</option>
+                      <option value={1600}>1×</option>
+                      <option value={800}>2×</option>
+                    </select>
+                    <span className="hidden sm:inline text-xs text-neutral-500">← → to step · Space to play</span>
+                  </div>
+                  <div className="flex items-center gap-3">
                     <span className="text-xs font-mono text-neutral-400">Scrub:</span>
                     <input
                       id="timeline-scrubber"
@@ -1346,6 +1431,17 @@ export default function App() {
                     </div>
                   )}
 
+                {/* Dynamic Memory Allocation, Pointer Canvas & Recursion Call-Tree Flamegraph */}
+                <MemoryCanvas
+                  problemId={currentProblem.traceFamilyId || currentProblem.id}
+                  step={currentStep}
+                  totalSteps={steps.length}
+                  onSelectStep={(idx) => setStepIndex(idx)}
+                  recursionTree={recursionTree}
+                  predictModeActive={predictModeActive}
+                  onCellClick={handleCellClickInCanvas}
+                />
+
                   {/* Side-by-Side Brute-Force vs Optimal ("Diff Mode") Panel */}
                   {showComplexityDiff && (
                     <div className="p-4 rounded-md border border-neutral-300 dark:border-neutral-700 bg-neutral-50 dark:bg-neutral-900/90 space-y-3">
@@ -1410,17 +1506,6 @@ export default function App() {
                     setCustomSteps(null);
                     setStepIndex(0);
                   }}
-                />
-
-                {/* Dynamic Memory Allocation, Pointer Canvas & Recursion Call-Tree Flamegraph */}
-                <MemoryCanvas
-                  problemId={currentProblem.traceFamilyId || currentProblem.id}
-                  step={currentStep}
-                  totalSteps={steps.length}
-                  onSelectStep={(idx) => setStepIndex(idx)}
-                  recursionTree={recursionTree}
-                  predictModeActive={predictModeActive}
-                  onCellClick={handleCellClickInCanvas}
                 />
               </div>
             </div>

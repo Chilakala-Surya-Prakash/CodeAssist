@@ -5,7 +5,8 @@
   "framework": "vite",
   "functions": {
     "api/tutor/trace.ts": { "maxDuration": 30 },
-    "api/tutor/chat.ts": { "maxDuration": 20 }
+    "api/tutor/chat.ts": { "maxDuration": 20 },
+    "api/tutor/explain.ts": { "maxDuration": 30 }
   },
   "rewrites": [
     {
