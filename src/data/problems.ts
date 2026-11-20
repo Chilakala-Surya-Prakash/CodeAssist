@@ -1081,6 +1081,201 @@ class LRUCache:
       spaceComplexity: 'O(1) — Four 32-bit int variables on the JVM stack',
       memoryProfileNote: 'No garbage collector pressure.'
     }
+  },
+  {
+    id: 'sort-colors-dutch-flag',
+    number: 75,
+    title: 'Dutch National Flag Three-Way Color Partition',
+    slug: 'sort-colors-dutch-flag',
+    difficulty: 'Medium',
+    pattern: 'Two Pointers',
+    summary: 'Partition an array of 0s, 1s, and 2s in a single O(N) in-place pass using low, mid, and high boundary pointers.',
+    description:
+      'Given an array nums containing only 0, 1, and 2, sort them in-place so objects of the same value are adjacent in the order 0, 1, 2. Use Dijkstra’s three-way Dutch National Flag partition in a single pass with O(1) extra memory.',
+    constraints: [
+      '1 <= nums.length <= 300',
+      'nums[i] is 0, 1, or 2',
+      'Single-pass O(N) time and O(1) auxiliary space without counting sort.'
+    ],
+    defaultInput: '2, 0, 2, 1, 1, 0',
+    sampleInputs: [
+      { label: 'Classic 6-Element Mix', value: '2, 0, 2, 1, 1, 0' },
+      { label: 'Reverse Sorted Triads', value: '2, 2, 1, 0, 0' },
+      { label: 'Minimal 3-Color Shuffle', value: '2, 0, 1' }
+    ],
+    companies: ['google', 'meta', 'amazon', 'microsoft', 'nvidia', 'uber', 'stripe', 'bloomberg'],
+    frequencyScore: 94,
+    keyInsight:
+      'Maintain three strict partition regions: [0..low-1] == 0, [low..mid-1] == 1, and [high+1..n-1] == 2. When swapping nums[mid] with nums[high], DO NOT increment mid because the element swapped in from high has not been inspected yet.',
+    pointerMechanicsNote:
+      'Three stack index registers (low, mid, high) converge in O(N) swaps: 0s swap to low (low++, mid++), 1s stay in place (mid++), and 2s swap to high (high-- only).',
+    python: {
+      code: `def sortColors(nums: list[int]) -> list[int]:
+    low, mid, high = 0, 0, len(nums) - 1
+    while mid <= high:
+        if nums[mid] == 0:
+            nums[low], nums[mid] = nums[mid], nums[low]
+            low += 1
+            mid += 1
+        elif nums[mid] == 1:
+            mid += 1
+        else:
+            nums[mid], nums[high] = nums[high], nums[mid]
+            high -= 1
+    return nums`,
+      timeComplexity: 'O(N) — Each element is inspected at most once',
+      spaceComplexity: 'O(1) — Three stack index registers (low, mid, high)',
+      memoryProfileNote: 'Mutates array slots in-place with zero auxiliary heap allocations.'
+    },
+    java: {
+      code: `public class Solution {
+    public void sortColors(int[] nums) {
+        int low = 0, mid = 0, high = nums.length - 1;
+        while (mid <= high) {
+            if (nums[mid] == 0) {
+                int tmp = nums[low]; nums[low] = nums[mid]; nums[mid] = tmp;
+                low++;
+                mid++;
+            } else if (nums[mid] == 1) {
+                mid++;
+            } else {
+                int tmp = nums[mid]; nums[mid] = nums[high]; nums[high] = tmp;
+                high--;
+            }
+        }
+    }
+}`,
+      timeComplexity: 'O(N) — Single linear pass over array buffer',
+      spaceComplexity: 'O(1) — Four 32-bit int registers on the JVM stack',
+      memoryProfileNote: 'Cache-friendly contiguous in-place swaps; zero GC pressure.'
+    }
+  },
+  {
+    id: 'kadane-max-subarray',
+    number: 53,
+    title: 'Maximum Subarray (Kadane Running Sum Invariant)',
+    slug: 'kadane-max-subarray',
+    difficulty: 'Medium',
+    pattern: 'Dynamic Programming',
+    summary: 'Compute the contiguous subarray with the largest sum in O(N) time and O(1) space by discarding negative running prefixes.',
+    description:
+      'Given an integer array nums, find the contiguous subarray (containing at least one number) which has the largest sum and return its sum. Compress the 1D DP state dp[i] = max(nums[i], dp[i-1] + nums[i]) into two scalar registers: cur_sum and best_sum.',
+    constraints: [
+      '1 <= nums.length <= 10^5',
+      '-10^4 <= nums[i] <= 10^4',
+      'Must execute in O(N) time and O(1) auxiliary space.'
+    ],
+    defaultInput: '-2, 1, -3, 4, -1, 2, 1, -5, 4',
+    sampleInputs: [
+      { label: 'Classic Kadane Signal', value: '-2, 1, -3, 4, -1, 2, 1, -5, 4' },
+      { label: 'All Negative Values', value: '-5, -2, -8, -1, -4' },
+      { label: 'Single Peak Recovery', value: '5, 4, -1, 7, 8' }
+    ],
+    companies: ['google', 'meta', 'amazon', 'apple', 'microsoft', 'linkedin', 'citadel', 'stripe'],
+    frequencyScore: 97,
+    keyInsight:
+      'Whenever the running prefix sum cur_sum becomes negative (or extending cur_sum + nums[i] is worse than starting fresh at nums[i]), carrying that prefix forward can only decrease any future subarray sum, so reset the active window at index i.',
+    pointerMechanicsNote:
+      'A single scan index i advances across the contiguous heap buffer while scalar registers cur_sum, best_sum, and active window boundaries [win_start..i] update in O(1).',
+    python: {
+      code: `def maxSubArray(nums: list[int]) -> int:
+    cur_sum = nums[0]
+    best_sum = nums[0]
+    for i in range(1, len(nums)):
+        if cur_sum + nums[i] < nums[i]:
+            cur_sum = nums[i]
+        else:
+            cur_sum = cur_sum + nums[i]
+        if cur_sum > best_sum:
+            best_sum = cur_sum
+    return best_sum`,
+      timeComplexity: 'O(N) — Single linear pass across N elements',
+      spaceComplexity: 'O(1) — Two scalar DP registers (cur_sum, best_sum)',
+      memoryProfileNote: 'Compresses an O(N) DP table down to two 8-byte stack registers.'
+    },
+    java: {
+      code: `public class Solution {
+    public int maxSubArray(int[] nums) {
+        int curSum = nums[0];
+        int bestSum = nums[0];
+        for (int i = 1; i < nums.length; i++) {
+            curSum = Math.max(nums[i], curSum + nums[i]);
+            if (curSum > bestSum) {
+                bestSum = curSum;
+            }
+        }
+        return bestSum;
+    }
+}`,
+      timeComplexity: 'O(N) — One comparison and addition per array element',
+      spaceComplexity: 'O(1) — Pure stack registers with zero heap allocation',
+      memoryProfileNote: 'Sequential scan yields near-100% L1 CPU prefetcher hit rate.'
+    }
+  },
+  {
+    id: 'merge-intervals-greedy',
+    number: 56,
+    title: 'Merge Overlapping Intervals (Sweep-Line Sort & Extend)',
+    slug: 'merge-intervals-greedy',
+    difficulty: 'Medium',
+    pattern: 'Two Pointers',
+    summary: 'Sort intervals by start coordinate and greedily merge overlapping spans by extending the last merged end boundary.',
+    description:
+      'Given an array of intervals where intervals[i] = [start_i, end_i], merge all overlapping intervals and return an array of the non-overlapping intervals that cover all the intervals in the input.',
+    constraints: [
+      '1 <= intervals.length <= 10^4',
+      '0 <= start_i <= end_i <= 10^4',
+      'Target Complexity: O(N log N) time for sorting + O(N) linear sweep.'
+    ],
+    defaultInput: '[1,3], [2,6], [8,10], [15,18]',
+    sampleInputs: [
+      { label: 'Classic 4-Interval Sweep', value: '[1,3], [2,6], [8,10], [15,18]' },
+      { label: 'Touching Boundary Merge', value: '[1,4], [4,5], [7,9]' },
+      { label: 'Nested Enclosure Intervals', value: '[1,10], [2,5], [6,8], [12,15]' }
+    ],
+    companies: ['google', 'meta', 'amazon', 'apple', 'microsoft', 'uber', 'databricks', 'stripe', 'salesforce'],
+    frequencyScore: 98,
+    keyInsight:
+      'Once intervals are sorted ascending by start coordinate, any interval that overlaps the current merged block MUST appear immediately next. If next.start <= merged[-1].end, extend merged[-1].end = max(merged[-1].end, next.end).',
+    pointerMechanicsNote:
+      'Pointer i sweeps through the sorted input buffer while write pointer last points to the tail slot of the merged output array.',
+    python: {
+      code: `def merge(intervals: list[list[int]]) -> list[list[int]]:
+    intervals.sort(key=lambda iv: iv[0])
+    merged = [intervals[0]]
+    for i in range(1, len(intervals)):
+        start, end = intervals[i]
+        if start <= merged[-1][1]:
+            merged[-1][1] = max(merged[-1][1], end)
+        else:
+            merged.append([start, end])
+    return merged`,
+      timeComplexity: 'O(N log N) — Sorting dominates the O(N) linear merge sweep',
+      spaceComplexity: 'O(N) — Output list holding merged non-overlapping intervals',
+      memoryProfileNote: 'Mutates merged[-1][1] in-place when extending overlapping intervals.'
+    },
+    java: {
+      code: `import java.util.*;
+public class Solution {
+    public int[][] merge(int[][] intervals) {
+        Arrays.sort(intervals, (a, b) -> Integer.compare(a[0], b[0]));
+        List<int[]> merged = new ArrayList<>();
+        merged.add(intervals[0]);
+        for (int i = 1; i < intervals.length; i++) {
+            int[] last = merged.get(merged.size() - 1);
+            if (intervals[i][0] <= last[1]) {
+                last[1] = Math.max(last[1], intervals[i][1]);
+            } else {
+                merged.add(intervals[i]);
+            }
+        }
+        return merged.toArray(new int[merged.size()][]);
+    }
+}`,
+      timeComplexity: 'O(N log N) — TimSort + single linear sweep',
+      spaceComplexity: 'O(N) — ArrayList of merged int[2] references',
+      memoryProfileNote: 'Updates last[1] in-place without allocating replacement interval objects.'
+    }
   }
 ];
 

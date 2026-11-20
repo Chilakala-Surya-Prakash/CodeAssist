@@ -8,12 +8,10 @@ import { COMPANIES } from './data/companies';
 import { CORE_TOPICS, PROBLEMS } from './data/problems';
 import { CoreTopic, ExecutionStep, Language } from './types/visualizer';
 import { generateExecutionTrace } from './utils/traceEngine';
+import { resolveActiveLine } from './utils/traceLineMap';
 import {
   buildPredictQuestion,
-  buildRecursionCallTree,
   computeComplexityDiff,
-  evaluateMockInterview,
-  getBlindStarterCode,
   getMultiLanguageCode,
   LANGUAGE_LABELS,
   MockRubricScorecard,
@@ -35,6 +33,8 @@ import {
 import { MemoryCanvas } from './components/MemoryCanvas';
 import { CodeEditorPanel } from './components/CodeEditorPanel';
 import { ScenarioTemplatesBar } from './components/ScenarioTemplatesBar';
+import { SystemsConcurrencyLab } from './components/SystemsConcurrencyLab';
+import { MockInterviewArena } from './components/MockInterviewArena';
 
 const CompanyDirectory = lazy(() =>
   import('./components/CompanyDirectory').then((m) => ({ default: m.CompanyDirectory }))
@@ -43,15 +43,10 @@ const TutorDrawer = lazy(() =>
   import('./components/TutorDrawer').then((m) => ({ default: m.TutorDrawer }))
 );
 import {
-  Award,
   Bookmark,
   Check,
   ChevronLeft,
   ChevronRight,
-  Clock,
-  Cpu,
-  Download,
-  EyeOff,
   HelpCircle,
   Monitor,
   Moon,
@@ -59,7 +54,6 @@ import {
   Scale,
   Pause,
   Play,
-  Server,
   Share2,
   Sliders,
   Sun,
@@ -113,6 +107,7 @@ export default function App() {
   const [codeMap, setCodeMap] = useState<Record<string, Partial<Record<Language, string>>>>({});
 
   const [customSteps, setCustomSteps] = useState<ExecutionStep[] | null>(null);
+  const [customTraceError, setCustomTraceError] = useState<string | null>(null);
   const [isTracingGemini, setIsTracingGemini] = useState<boolean>(false);
   const [stepIndex, setStepIndex] = useState<number>(initialUrlParams?.stepIndex || 0);
   const [isTutorOpen, setIsTutorOpen] = useState<boolean>(false);
@@ -200,6 +195,18 @@ export default function App() {
     return '';
   });
   const [mockScorecard, setMockScorecard] = useState<MockRubricScorecard | null>(null);
+  const [mockHistory, setMockHistory] = useState<MockRubricScorecard[]>(() => {
+    try {
+      const saved = window.localStorage.getItem('tracecraft-mock-history');
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed)) return parsed;
+      }
+    } catch {
+      // ignore
+    }
+    return [];
+  });
 
   // Interactive System Design & OS Concurrency Visualizer State
   const [selectedSysScenarioId, setSelectedSysScenarioId] = useState<string>(
@@ -286,6 +293,14 @@ export default function App() {
     }
   }, [bookmarks]);
 
+  useEffect(() => {
+    try {
+      window.localStorage.setItem('tracecraft-mock-history', JSON.stringify(mockHistory));
+    } catch {
+      // ignore
+    }
+  }, [mockHistory]);
+
   // Mock Interview Countdown Timer
   useEffect(() => {
     if (!mockActive) return;
@@ -307,6 +322,16 @@ export default function App() {
     [activeTopic]
   );
 
+  const canonicalCodeForLang = useMemo(
+    () => getMultiLanguageCode(currentProblem, language),
+    [currentProblem, language]
+  );
+
+  const activeCode =
+    codeMap[currentProblem.id]?.[language] ?? canonicalCodeForLang;
+
+  const hasCustomCodeEdits = activeCode.trim() !== canonicalCodeForLang.trim();
+
   const deterministicSteps = useMemo(
     () => generateExecutionTrace(currentProblem.id, customInput),
     [currentProblem.id, customInput]
@@ -316,9 +341,42 @@ export default function App() {
   const boundedStepIndex = Math.min(stepIndex, Math.max(0, steps.length - 1));
   const currentStep = steps[boundedStepIndex] || steps[0];
 
-  // Autoplay: advance one step per tick; stop at the last step
+  // Autoplay & Breakpoints: advance one step per tick; stop at breakpoints or the last step
   const [isPlaying, setIsPlaying] = useState<boolean>(false);
   const [playDelayMs, setPlayDelayMs] = useState<number>(1600);
+  const [breakpoints, setBreakpoints] = useState<Set<number>>(() => new Set());
+  const [pausedAtBreakpointLine, setPausedAtBreakpointLine] = useState<number | null>(null);
+
+  const getStepLine = useCallback(
+    (s: ExecutionStep) => resolveActiveLine(s, language, currentProblem.python.code, activeCode),
+    [language, currentProblem.python.code, activeCode]
+  );
+
+  const handleToggleBreakpoint = useCallback((lineNum: number) => {
+    setBreakpoints((prev) => {
+      const next = new Set(prev);
+      if (next.has(lineNum)) next.delete(lineNum);
+      else next.add(lineNum);
+      return next;
+    });
+    setPausedAtBreakpointLine(null);
+  }, []);
+
+  const handleContinueToBreakpoint = useCallback(() => {
+    if (breakpoints.size === 0) return;
+    setIsPlaying(false);
+    for (let idx = boundedStepIndex + 1; idx < steps.length; idx++) {
+      const lineNum = getStepLine(steps[idx]);
+      if (breakpoints.has(lineNum)) {
+        setStepIndex(idx);
+        setPausedAtBreakpointLine(lineNum);
+        return;
+      }
+    }
+    // No later breakpoint hit: advance to the end
+    setStepIndex(steps.length - 1);
+    setPausedAtBreakpointLine(null);
+  }, [breakpoints, boundedStepIndex, steps, getStepLine]);
 
   useEffect(() => {
     if (!isPlaying) return;
@@ -326,13 +384,26 @@ export default function App() {
       setIsPlaying(false);
       return;
     }
-    const t = window.setTimeout(() => setStepIndex((i) => Math.min(steps.length - 1, i + 1)), playDelayMs);
+    const t = window.setTimeout(() => {
+      const nextIdx = Math.min(steps.length - 1, boundedStepIndex + 1);
+      const nextLine = getStepLine(steps[nextIdx]);
+      setStepIndex(nextIdx);
+      if (breakpoints.has(nextLine)) {
+        setIsPlaying(false);
+        setPausedAtBreakpointLine(nextLine);
+      } else {
+        setPausedAtBreakpointLine(null);
+      }
+    }, playDelayMs);
     return () => window.clearTimeout(t);
-  }, [isPlaying, boundedStepIndex, steps.length, playDelayMs]);
+  }, [isPlaying, boundedStepIndex, steps, playDelayMs, breakpoints, getStepLine]);
 
-  // Stop playback when the problem or trace changes
+  // Stop playback and clear breakpoints/errors when problem or trace changes
   useEffect(() => {
     setIsPlaying(false);
+    setBreakpoints(new Set());
+    setPausedAtBreakpointLine(null);
+    setCustomTraceError(null);
   }, [currentProblem.id, customSteps]);
 
   // Keyboard stepping: ← → Home End, Space toggles play (ignored while typing)
@@ -343,11 +414,27 @@ export default function App() {
       const el = e.target as HTMLElement | null;
       const tag = el?.tagName;
       if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT' || el?.isContentEditable) return;
-      if (e.key === 'ArrowRight') { e.preventDefault(); setStepIndex((i) => Math.min(steps.length - 1, i + 1)); }
-      else if (e.key === 'ArrowLeft') { e.preventDefault(); setStepIndex((i) => Math.max(0, i - 1)); }
-      else if (e.key === 'Home') { e.preventDefault(); setStepIndex(0); }
-      else if (e.key === 'End') { e.preventDefault(); setStepIndex(steps.length - 1); }
-      else if (e.key === ' ' && tag !== 'BUTTON') { e.preventDefault(); setIsPlaying((p) => !p); }
+      if (e.key === 'ArrowRight') {
+        e.preventDefault();
+        setPausedAtBreakpointLine(null);
+        setStepIndex((i) => Math.min(steps.length - 1, i + 1));
+      } else if (e.key === 'ArrowLeft') {
+        e.preventDefault();
+        setPausedAtBreakpointLine(null);
+        setStepIndex((i) => Math.max(0, i - 1));
+      } else if (e.key === 'Home') {
+        e.preventDefault();
+        setPausedAtBreakpointLine(null);
+        setStepIndex(0);
+      } else if (e.key === 'End') {
+        e.preventDefault();
+        setPausedAtBreakpointLine(null);
+        setStepIndex(steps.length - 1);
+      } else if (e.key === ' ' && tag !== 'BUTTON') {
+        e.preventDefault();
+        setPausedAtBreakpointLine(null);
+        setIsPlaying((p) => !p);
+      }
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
@@ -358,9 +445,22 @@ export default function App() {
     [currentProblem, steps, boundedStepIndex]
   );
 
-  const recursionTree = useMemo(
-    () => buildRecursionCallTree(currentProblem, steps, boundedStepIndex),
-    [currentProblem, steps, boundedStepIndex]
+  const topicProblemCounts = useMemo(() => {
+    const map: Record<string, number> = {};
+    for (const p of PROBLEMS) {
+      const t = p.topic || 'Arrays';
+      map[t] = (map[t] || 0) + 1;
+    }
+    return map;
+  }, []);
+
+  const nativeTopicProblems = useMemo(
+    () => topicProblems.filter((p) => p.traceMode === 'native'),
+    [topicProblems]
+  );
+  const templateTopicProblems = useMemo(
+    () => topicProblems.filter((p) => p.traceMode !== 'native'),
+    [topicProblems]
   );
 
   const predictQuestion = useMemo(
@@ -494,6 +594,7 @@ export default function App() {
       spacedRepetitionSchedule: srSchedule,
       bookmarks,
       quizStats,
+      mockHistory,
     };
     const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
     const url = URL.createObjectURL(blob);
@@ -502,7 +603,7 @@ export default function App() {
     a.download = 'tracecraft-progress-backup.json';
     a.click();
     URL.revokeObjectURL(url);
-  }, [solvedProblemIds, srSchedule, bookmarks, quizStats]);
+  }, [solvedProblemIds, srSchedule, bookmarks, quizStats, mockHistory]);
 
   const handleStepCommand = useCallback(
     (action: 'next' | 'prev' | 'reset' | 'goto', targetIdx?: number) => {
@@ -519,16 +620,9 @@ export default function App() {
     [steps.length]
   );
 
-  const canonicalCodeForLang = useMemo(
-    () => getMultiLanguageCode(currentProblem, language),
-    [currentProblem, language]
-  );
-
-  const activeCode =
-    codeMap[currentProblem.id]?.[language] ?? canonicalCodeForLang;
-
   const handleRunGeminiCustomTrace = async () => {
     setIsTracingGemini(true);
+    setCustomTraceError(null);
     try {
       const res = await fetch('/api/tutor/trace', {
         method: 'POST',
@@ -540,92 +634,94 @@ export default function App() {
           problemTitle: currentProblem.title,
         }),
       });
-      const data = await res.json();
-      if (res.ok && Array.isArray(data.steps) && data.steps.length > 0) {
-        const mapped: ExecutionStep[] = data.steps.map((s: any, idx: number) => ({
-          stepIndex: idx,
-          title: s.title || `Execution Step ${idx + 1}`,
-          pythonLine: s.pythonLine || 1,
-          javaLine: s.javaLine || 1,
-          operationType: (s.operationType as any) || 'MUTATE_MEMORY',
-          intuition: s.intuition || 'Dynamic execution step traced.',
-          memoryMutation: s.memoryMutation || 'Updated stack & heap state.',
-          invariantCheck: s.invariantCheck || 'Loop invariant maintained.',
-          stdout: s.stdout,
-          stackFrames: [
-            {
-              id: `custom-frame-${idx}`,
-              functionName: `${currentProblem.slug}()`,
-              line: s.pythonLine || 1,
-              returnAddress: '0x7FFF0100',
-              isActive: true,
-              variables: (s.stackVariables || []).map((v: any) => ({
-                name: v.name || 'var',
-                value: String(v.value ?? ''),
-                type: v.type || 'int',
-                address: v.address || '0x7FFF0108',
-                isPointer: Boolean(v.isPointer),
-                changed: true,
-              })),
-            },
-          ],
-          heapObjects: [
-            {
-              id: 'custom-heap',
-              address: '0x1040',
-              type: 'Array',
-              label: `Custom Traced Heap State (${LANGUAGE_LABELS[language]})`,
-              byteSize: 64,
-              refCount: 1,
-              gcStatus: 'mutated',
-              cells: (s.heapCells || []).map((c: any, cIdx: number) => ({
-                index: c.index ?? cIdx,
-                label: c.label || `[${cIdx}]`,
-                value: c.value ?? 0,
-                addressOffset: c.addressOffset || `0x10${40 + cIdx * 4}`,
-                nextAddress: c.nextAddress || null,
-                status: (c.status as any) || 'active',
-                annotation: c.annotation || '',
-              })),
-            },
-          ],
-          pointers: (s.pointers || []).map((p: any, pIdx: number) => ({
-            id: `cp-${pIdx}`,
-            name: p.name || 'ptr',
-            targetObjectId: 'custom-heap',
-            targetIndex: p.targetIndex ?? 0,
-            targetAddress: p.targetAddress || '0x1040',
-            role: pIdx === 0 ? 'primary' : 'secondary',
-            deltaDescription: p.deltaDescription,
-          })),
-          metrics: {
-            comparisons: idx + 1,
-            pointerOps: idx + 1,
-            heapBytesUsed: 64,
-            timeStepO: `Step ${idx + 1}`,
-          },
-        }));
-        setCustomSteps(mapped);
-        setStepIndex(0);
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setCustomTraceError(
+          data?.error ||
+            `Custom trace service returned HTTP ${res.status}. Showing canonical deterministic trace instead.`
+        );
+        return;
       }
-    } catch {
-      // Fallback to deterministic engine
+      if (!Array.isArray(data.steps) || data.steps.length === 0) {
+        setCustomTraceError(
+          'Custom trace returned no executable steps for this snippet. Showing canonical deterministic trace instead.'
+        );
+        return;
+      }
+      const mapped: ExecutionStep[] = data.steps.map((s: any, idx: number) => ({
+        stepIndex: idx,
+        title: s.title || `Execution Step ${idx + 1}`,
+        pythonLine: s.pythonLine || 1,
+        javaLine: s.javaLine || 1,
+        operationType: (s.operationType as any) || 'MUTATE_MEMORY',
+        intuition: s.intuition || 'Dynamic execution step traced.',
+        memoryMutation: s.memoryMutation || 'Updated stack & heap state.',
+        invariantCheck: s.invariantCheck || 'Loop invariant maintained.',
+        stdout: s.stdout,
+        stackFrames: [
+          {
+            id: `custom-frame-${idx}`,
+            functionName: `${currentProblem.slug}()`,
+            line: s.pythonLine || 1,
+            returnAddress: '0x7FFF0100',
+            isActive: true,
+            variables: (s.stackVariables || []).map((v: any) => ({
+              name: v.name || 'var',
+              value: String(v.value ?? ''),
+              type: v.type || 'int',
+              address: v.address || '0x7FFF0108',
+              isPointer: Boolean(v.isPointer),
+              changed: true,
+            })),
+          },
+        ],
+        heapObjects: [
+          {
+            id: 'custom-heap',
+            address: '0x1040',
+            type: 'Array',
+            label: `Custom Traced Heap State (${LANGUAGE_LABELS[language]})`,
+            byteSize: 64,
+            refCount: 1,
+            gcStatus: 'mutated',
+            cells: (s.heapCells || []).map((c: any, cIdx: number) => ({
+              index: c.index ?? cIdx,
+              label: c.label || `[${cIdx}]`,
+              value: c.value ?? 0,
+              addressOffset: c.addressOffset || `0x10${40 + cIdx * 4}`,
+              nextAddress: c.nextAddress || null,
+              status: (c.status as any) || 'active',
+              annotation: c.annotation || '',
+            })),
+          },
+        ],
+        pointers: (s.pointers || []).map((p: any, pIdx: number) => ({
+          id: `cp-${pIdx}`,
+          name: p.name || 'ptr',
+          targetObjectId: 'custom-heap',
+          targetIndex: p.targetIndex ?? 0,
+          targetAddress: p.targetAddress || '0x1040',
+          role: pIdx === 0 ? 'primary' : 'secondary',
+          deltaDescription: p.deltaDescription,
+        })),
+        metrics: {
+          comparisons: idx + 1,
+          pointerOps: idx + 1,
+          heapBytesUsed: 64,
+          timeStepO: `Step ${idx + 1}`,
+        },
+      }));
+      setCustomSteps(mapped);
+      setStepIndex(0);
+    } catch (err: any) {
+      setCustomTraceError(
+        err?.message ||
+          'Could not reach /api/tutor/trace. Showing canonical deterministic trace instead.'
+      );
     } finally {
       setIsTracingGemini(false);
     }
   };
-
-  const activeSysScenario = useMemo(
-    () =>
-      SYSTEMS_CONCURRENCY_SCENARIOS.find((s) => s.id === selectedSysScenarioId) ||
-      SYSTEMS_CONCURRENCY_SCENARIOS[0],
-    [selectedSysScenarioId]
-  );
-  const boundedSysStepIdx = Math.min(
-    sysStepIdx,
-    Math.max(0, activeSysScenario.steps.length - 1)
-  );
-  const currentSysStep = activeSysScenario.steps[boundedSysStepIdx];
 
   return (
     <div className={`flex flex-col bg-[#FAFAFA] text-neutral-900 dark:bg-[#0A0A0A] dark:text-neutral-100 ${activeTab === 'visualizer' ? 'min-h-screen lg:h-screen lg:overflow-hidden' : 'min-h-screen'}`}>
@@ -668,7 +764,7 @@ export default function App() {
                 : 'border-transparent'
             }`}
           >
-            Topics & 200 Questions
+            Topics &amp; Questions
           </button>
           <button
             type="button"
@@ -729,7 +825,7 @@ export default function App() {
                   >
                     {CORE_TOPICS.map((tMeta) => (
                       <option key={tMeta.id} value={tMeta.id}>
-                        {tMeta.label} (25)
+                        {tMeta.label} ({topicProblemCounts[tMeta.id] || 0})
                       </option>
                     ))}
                   </select>
@@ -738,7 +834,7 @@ export default function App() {
 
                 <span className="text-neutral-300 dark:text-neutral-700">/</span>
 
-                {/* Question Selector Dropdown */}
+                {/* Question Selector Dropdown grouped honestly by Native vs Pattern Template */}
                 <div className="relative inline-flex items-center min-w-0">
                   <select
                     id="problem-select"
@@ -747,26 +843,35 @@ export default function App() {
                     aria-label="Select Question"
                     className="appearance-none bg-neutral-100 hover:bg-neutral-200/80 dark:bg-neutral-900 dark:hover:bg-neutral-800 text-neutral-950 dark:text-neutral-100 text-xs font-bold px-2.5 py-1.5 pr-6 rounded-md border border-neutral-300/80 dark:border-neutral-700/80 cursor-pointer focus:outline-none max-w-xs sm:max-w-md truncate transition-colors"
                   >
-                    {topicProblems.map((p) => (
-                      <option key={p.id} value={p.id}>
-                        [{p.topicCode || `Q-${p.number}`}] {p.title}
-                      </option>
-                    ))}
+                    {nativeTopicProblems.length > 0 && (
+                      <optgroup label="Native Memory Traces (Exact 1:1 Execution)">
+                        {nativeTopicProblems.map((p) => (
+                          <option key={p.id} value={p.id}>
+                            [{p.topicCode}] {p.title}
+                          </option>
+                        ))}
+                      </optgroup>
+                    )}
+                    {templateTopicProblems.length > 0 && (
+                      <optgroup label="Pattern Practice (Shared Trace Template)">
+                        {templateTopicProblems.map((p) => (
+                          <option key={p.id} value={p.id}>
+                            [{p.topicCode}] {p.title}
+                          </option>
+                        ))}
+                      </optgroup>
+                    )}
                   </select>
                   <span className="pointer-events-none absolute right-2 text-[11px] text-neutral-400">▾</span>
                 </div>
 
-                {/* Difficulty Badge */}
-                <span
-                  className={`px-2 py-0.5 rounded text-[11px] font-mono font-bold uppercase tracking-wider ${
-                    currentProblem.difficulty === 'Easy'
-                      ? 'bg-emerald-50 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-400 border border-emerald-300/60 dark:border-emerald-800/60'
-                      : currentProblem.difficulty === 'Medium'
-                      ? 'bg-amber-50 text-amber-700 dark:bg-amber-950/60 dark:text-amber-400 border border-amber-300/60 dark:border-amber-800/60'
-                      : 'bg-red-50 text-red-700 dark:bg-red-950/60 dark:text-red-400 border border-red-300/60 dark:border-red-800/60'
-                  }`}
-                >
-                  {currentProblem.difficulty}
+                {/* Unboxed metadata: Difficulty & Trace Fidelity */}
+                <span className="text-xs font-mono text-neutral-600 dark:text-neutral-400 whitespace-nowrap">
+                  <strong className="text-neutral-900 dark:text-neutral-100">{currentProblem.difficulty}</strong>
+                  <span aria-hidden="true"> · </span>
+                  <span>
+                    {currentProblem.traceMode === 'native' ? 'Native Trace' : 'Pattern Template'}
+                  </span>
                 </span>
               </div>
 
@@ -1159,6 +1264,31 @@ export default function App() {
                   <p className="text-xs sm:text-sm text-neutral-700 dark:text-neutral-300 leading-relaxed">
                     {currentProblem.description}
                   </p>
+
+                  {/* Transparent Pattern-Template Disclosure */}
+                  {currentProblem.traceMode === 'pattern-template' && !customSteps && (
+                    <div
+                      data-testid="pattern-template-notice"
+                      className="rounded-lg border border-amber-300/80 dark:border-amber-700/70 bg-amber-50/70 dark:bg-amber-950/30 p-3 text-xs space-y-1.5"
+                    >
+                      <div className="font-mono font-semibold text-amber-900 dark:text-amber-200">
+                        Shared Pattern Template · {currentProblem.traceTemplateTitle || currentProblem.traceFamilyId}
+                      </div>
+                      <p className="text-amber-900/90 dark:text-amber-200/85 leading-relaxed">
+                        This entry uses the <strong>{currentProblem.traceTemplateTitle || currentProblem.traceFamilyId}</strong> pointer tracer to illustrate the underlying memory pattern. To trace a custom implementation of this problem, click <strong>Edit Source Code</strong> and run <strong>Trace Custom Code</strong>.
+                      </p>
+                      {currentProblem.traceFamilyId && (
+                        <button
+                          type="button"
+                          onClick={() => handleSelectProblem(currentProblem.traceFamilyId!)}
+                          className="text-xs font-mono font-semibold text-amber-950 dark:text-amber-100 underline underline-offset-2 hover:opacity-80"
+                        >
+                          Open native {currentProblem.traceTemplateTitle || currentProblem.traceFamilyId} trace →
+                        </button>
+                      )}
+                    </div>
+                  )}
+
                   <div className="pt-3 border-t border-neutral-200 dark:border-neutral-800 space-y-2 text-xs">
                     <div>
                       <span className="font-semibold text-neutral-950 dark:text-neutral-100">
@@ -1232,9 +1362,18 @@ export default function App() {
                   onRunGeminiCustomTrace={handleRunGeminiCustomTrace}
                   isTracingGemini={isTracingGemini}
                   currentStep={currentStep}
-                  stepIndex={boundedStepIndex}
-                  totalSteps={steps.length}
-                  onStepCommand={handleStepCommand}
+                  breakpoints={breakpoints}
+                  onToggleBreakpoint={handleToggleBreakpoint}
+                  hasCustomCodeEdits={hasCustomCodeEdits}
+                  isCustomTraceActive={Boolean(customSteps && customSteps.length > 0)}
+                  customTraceStepCount={customSteps?.length ?? 0}
+                  customTraceError={customTraceError}
+                  onClearCustomTrace={() => {
+                    setCustomSteps(null);
+                    setCustomTraceError(null);
+                    setStepIndex(0);
+                  }}
+                  onDismissCustomTraceError={() => setCustomTraceError(null)}
                 />
               </div>
 
@@ -1299,10 +1438,30 @@ export default function App() {
                   <div className="sr-only-live" role="status" aria-live="polite" aria-atomic="true">
                     Step {boundedStepIndex + 1} of {steps.length}: {currentStep.title}. {currentStep.intuition}
                   </div>
-                  <div className="flex flex-wrap items-center gap-2 pt-2 border-t border-neutral-100 dark:border-neutral-800/80">
+                  <div
+                    className="flex flex-wrap items-center gap-2 pt-2 border-t border-neutral-100 dark:border-neutral-800/80"
+                    data-testid="unified-playback-bar"
+                  >
                     <button
                       type="button"
-                      onClick={() => setStepIndex((i) => Math.max(0, i - 1))}
+                      onClick={() => {
+                        setIsPlaying(false);
+                        setPausedAtBreakpointLine(null);
+                        setStepIndex(0);
+                      }}
+                      disabled={boundedStepIndex === 0}
+                      aria-label="Reset execution to first step"
+                      title="Reset to Step 1 (Home)"
+                      className="p-1.5 rounded-md border border-neutral-300 dark:border-neutral-700 text-neutral-700 dark:text-neutral-300 hover:bg-neutral-100 dark:hover:bg-neutral-900 disabled:opacity-40"
+                    >
+                      <RotateCcw className="w-3.5 h-3.5" />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setPausedAtBreakpointLine(null);
+                        setStepIndex((i) => Math.max(0, i - 1));
+                      }}
                       disabled={boundedStepIndex === 0}
                       aria-label="Previous step"
                       className="p-1.5 rounded-md border border-neutral-300 dark:border-neutral-700 text-neutral-700 dark:text-neutral-300 hover:bg-neutral-100 dark:hover:bg-neutral-900 disabled:opacity-40"
@@ -1312,24 +1471,38 @@ export default function App() {
                     <button
                       type="button"
                       onClick={() => {
+                        setPausedAtBreakpointLine(null);
                         if (boundedStepIndex >= steps.length - 1) setStepIndex(0);
                         setIsPlaying((p) => !p);
                       }}
                       aria-label={isPlaying ? 'Pause autoplay' : 'Play steps automatically'}
-                      className="px-2.5 py-1.5 rounded-md bg-neutral-900 text-white dark:bg-neutral-100 dark:text-neutral-950 text-xs font-medium flex items-center gap-1"
+                      className="px-2.5 py-1.5 rounded-md bg-neutral-900 text-white dark:bg-neutral-100 dark:text-neutral-950 text-xs font-medium flex items-center gap-1 whitespace-nowrap shrink-0"
                     >
                       {isPlaying ? <Pause className="w-3.5 h-3.5" /> : <Play className="w-3.5 h-3.5" />}
                       {isPlaying ? 'Pause' : 'Play'}
                     </button>
                     <button
                       type="button"
-                      onClick={() => setStepIndex((i) => Math.min(steps.length - 1, i + 1))}
+                      onClick={() => {
+                        setPausedAtBreakpointLine(null);
+                        setStepIndex((i) => Math.min(steps.length - 1, i + 1));
+                      }}
                       disabled={boundedStepIndex >= steps.length - 1}
                       aria-label="Next step"
                       className="p-1.5 rounded-md border border-neutral-300 dark:border-neutral-700 text-neutral-700 dark:text-neutral-300 hover:bg-neutral-100 dark:hover:bg-neutral-900 disabled:opacity-40"
                     >
                       <ChevronRight className="w-4 h-4" />
                     </button>
+                    {breakpoints.size > 0 && (
+                      <button
+                        type="button"
+                        onClick={handleContinueToBreakpoint}
+                        disabled={boundedStepIndex >= steps.length - 1}
+                        className="px-2.5 py-1.5 rounded-md border border-red-300 dark:border-red-800 bg-red-50 dark:bg-red-950/40 text-red-700 dark:text-red-300 text-xs font-mono font-semibold hover:bg-red-100 dark:hover:bg-red-950/70 disabled:opacity-40 whitespace-nowrap shrink-0"
+                      >
+                        Continue to Breakpoint
+                      </button>
+                    )}
                     <select
                       aria-label="Playback speed"
                       value={playDelayMs}
@@ -1340,21 +1513,37 @@ export default function App() {
                       <option value={1600}>1×</option>
                       <option value={800}>2×</option>
                     </select>
-                    <span className="hidden sm:inline text-xs text-neutral-500">← → to step · Space to play</span>
+                    {pausedAtBreakpointLine !== null ? (
+                      <span
+                        data-testid="breakpoint-hit-status"
+                        className="text-xs font-mono font-semibold text-red-600 dark:text-red-400"
+                      >
+                        Paused at breakpoint · Line {pausedAtBreakpointLine}
+                      </span>
+                    ) : (
+                      <span className="hidden sm:inline text-xs text-neutral-500">
+                        ← → step · Space play
+                      </span>
+                    )}
                   </div>
                   <div className="flex items-center gap-3">
-                    <span className="text-xs font-mono text-neutral-400">Scrub:</span>
+                    <label htmlFor="timeline-scrubber" className="text-xs font-mono text-neutral-500">
+                      Timeline:
+                    </label>
                     <input
                       id="timeline-scrubber"
                       type="range"
                       min={0}
                       max={Math.max(0, steps.length - 1)}
                       value={boundedStepIndex}
-                      onChange={(e) => setStepIndex(Number(e.target.value))}
+                      onChange={(e) => {
+                        setPausedAtBreakpointLine(null);
+                        setStepIndex(Number(e.target.value));
+                      }}
                       className="flex-1 accent-blue-600 cursor-pointer h-1.5"
                     />
-                    <span className="text-xs font-mono text-neutral-500 tabular-nums">
-                      Line {language === 'python' ? currentStep.pythonLine : currentStep.javaLine}
+                    <span className="text-xs font-mono text-neutral-500 tabular-nums whitespace-nowrap">
+                      Line {getStepLine(currentStep)}
                     </span>
                   </div>
                 </div>
@@ -1431,13 +1620,12 @@ export default function App() {
                     </div>
                   )}
 
-                {/* Dynamic Memory Allocation, Pointer Canvas & Recursion Call-Tree Flamegraph */}
+                {/* Dynamic Memory Allocation & Pointer Canvas */}
                 <MemoryCanvas
                   problemId={currentProblem.traceFamilyId || currentProblem.id}
                   step={currentStep}
                   totalSteps={steps.length}
                   onSelectStep={(idx) => setStepIndex(idx)}
-                  recursionTree={recursionTree}
                   predictModeActive={predictModeActive}
                   onCellClick={handleCellClickInCanvas}
                 />
@@ -1542,348 +1730,84 @@ export default function App() {
 
         {activeTab === 'roadmap' && (
           <div className="space-y-8" data-testid="pattern-roadmap-view">
-            {/* 1. Interactive System Design & Low-Level OS Concurrency Memory Visualizer */}
-            <div
-              className="rounded-lg border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-[#111111] p-6 space-y-5"
-              data-testid="systems-concurrency-visualizer"
-            >
-              <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 pb-4 border-b border-neutral-200 dark:border-neutral-800">
-                <div>
-                  <div className="text-xs font-mono text-neutral-500 dark:text-neutral-400">
-                    DISTRIBUTED ARCHITECTURE & OS / HARDWARE CONCURRENCY SIMULATOR
-                  </div>
-                  <h2 className="text-xl font-bold text-neutral-950 dark:text-neutral-100 mt-1">
-                    System Design Packet Tracer & CPU Cache / Mutex Concurrency Lab
-                  </h2>
-                  <p className="text-xs sm:text-sm text-neutral-600 dark:text-neutral-400 mt-1">
-                    Step through Distributed Consistent Hashing, Redis Stampede Lease Locks, Token Bucket Rate Limiters, CPU 64B Cache Line False Sharing (MESI), and AB-BA Mutex Deadlocks.
-                  </p>
-                </div>
+            <SystemsConcurrencyLab
+              selectedScenarioId={selectedSysScenarioId}
+              onSelectScenario={setSelectedSysScenarioId}
+              stepIdx={sysStepIdx}
+              onStepChange={setSysStepIdx}
+            />
 
-                {/* Scenario Selector */}
-                <div className="flex flex-wrap items-center gap-1.5">
-                  {SYSTEMS_CONCURRENCY_SCENARIOS.map((scen) => (
-                    <button
-                      key={scen.id}
-                      type="button"
-                      onClick={() => {
-                        setSelectedSysScenarioId(scen.id);
-                        setSysStepIdx(0);
-                      }}
-                      className={`px-3 py-1.5 text-xs font-mono rounded-md border transition-colors ${
-                        activeSysScenario.id === scen.id
-                          ? 'border-neutral-900 bg-neutral-900 text-white dark:border-neutral-100 dark:bg-neutral-100 dark:text-neutral-950 font-semibold'
-                          : 'border-neutral-300 dark:border-neutral-700 text-neutral-700 dark:text-neutral-300 hover:bg-neutral-100 dark:hover:bg-neutral-800'
-                      }`}
-                    >
-                      {scen.category === 'Distributed System Design' ? (
-                        <Server className="w-3 h-3 inline mr-1" />
-                      ) : (
-                        <Cpu className="w-3 h-3 inline mr-1" />
-                      )}
-                      {scen.title.split('&')[0].trim()}
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              <div className="space-y-4">
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-3.5 rounded-md bg-neutral-50 dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800">
-                  <div>
-                    <div className="text-xs font-mono text-neutral-500">
-                      {activeSysScenario.category} · Target Firms: {activeSysScenario.companies.join(', ')}
-                    </div>
-                    <div className="text-sm font-semibold text-neutral-950 dark:text-white mt-0.5">
-                      Step {boundedSysStepIdx + 1}/{activeSysScenario.steps.length}: {currentSysStep.title}
-                    </div>
-                    <p className="text-xs font-mono text-neutral-700 dark:text-neutral-300 mt-1">
-                      Packet / Bus Trace: {currentSysStep.packetLabel}
-                    </p>
-                  </div>
-
-                  <div className="flex items-center gap-2 shrink-0">
-                    <button
-                      type="button"
-                      onClick={() => setSysStepIdx((i) => Math.max(0, i - 1))}
-                      disabled={boundedSysStepIdx === 0}
-                      className="px-3 py-1.5 text-xs font-mono rounded border border-neutral-300 dark:border-neutral-700 disabled:opacity-40"
-                    >
-                      ← Prev Step
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() =>
-                        setSysStepIdx((i) =>
-                          Math.min(activeSysScenario.steps.length - 1, i + 1)
-                        )
-                      }
-                      disabled={boundedSysStepIdx >= activeSysScenario.steps.length - 1}
-                      className="px-3 py-1.5 text-xs font-mono rounded bg-neutral-900 text-white dark:bg-neutral-100 dark:text-neutral-950 disabled:opacity-40"
-                    >
-                      Next Step →
-                    </button>
-                  </div>
-                </div>
-
-                {/* Topological Nodes / CPU Cores / Lock Registers Grid */}
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5">
-                  {activeSysScenario.nodes.map((node) => {
-                    const isHot = currentSysStep.activeNodeIds.includes(node.id);
-                    return (
-                      <div
-                        key={node.id}
-                        className={`p-4 rounded-md border transition-all flex flex-col justify-between space-y-2 ${
-                          isHot
-                            ? 'border-neutral-900 dark:border-neutral-100 bg-neutral-100 dark:bg-neutral-800/90 ring-1 ring-neutral-900 dark:ring-neutral-100'
-                            : 'border-neutral-200 dark:border-neutral-800 bg-neutral-50 dark:bg-neutral-900/60'
-                        }`}
-                      >
-                        <div className="flex items-center justify-between text-[11px] font-mono text-neutral-500">
-                          <span>{node.address}</span>
-                          <span className="uppercase font-bold text-neutral-900 dark:text-neutral-100">
-                            {isHot ? 'ACTIVE' : 'IDLE'}
-                          </span>
-                        </div>
-                        <div className="text-sm font-mono font-bold text-neutral-950 dark:text-white">
-                          {node.label}
-                        </div>
-                        <div className="text-xs font-mono text-neutral-600 dark:text-neutral-400">
-                          {node.sublabel}
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-
-                {/* Live State & Telemetry Table */}
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                  {currentSysStep.stateTable.map((row) => (
-                    <div
-                      key={row.key}
-                      className="p-3 rounded border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-[#111111] text-xs font-mono"
-                    >
-                      <div className="flex items-center justify-between text-[11px] text-neutral-500">
-                        <span>{row.key}</span>
-                        <span className="font-bold text-neutral-900 dark:text-neutral-100">
-                          {row.status}
-                        </span>
-                      </div>
-                      <div className="font-semibold text-neutral-950 dark:text-white mt-1">
-                        {row.value}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-
-                <div className="p-3 rounded border border-neutral-200 dark:border-neutral-800 bg-neutral-50 dark:bg-neutral-900/50 text-xs font-mono text-neutral-700 dark:text-neutral-300">
-                  <strong>Hardware / Protocol Invariant:</strong> {currentSysStep.invariantNote}
-                </div>
-              </div>
-            </div>
-
-            {/* 2. Timed 45-Minute Live Voice Mock Interview Simulator & 5-Dimension Scorecard */}
-            <div className="rounded-lg border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-[#111111] p-6 space-y-5">
-              <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-4 border-b border-neutral-200 dark:border-neutral-800">
-                <div>
-                  <div className="text-xs font-mono text-neutral-500 dark:text-neutral-400">
-                    45-Minute Onsite Coding Round Simulator · Blind Coding + Live Voice Interviewer
-                  </div>
-                  <h2 className="text-xl font-bold text-neutral-950 dark:text-neutral-100 mt-1">
-                    Timed Mock Interview & 5-Dimension Hiring Committee Scorecard
-                  </h2>
-                  <p className="text-xs sm:text-sm text-neutral-600 dark:text-neutral-400 mt-1">
-                    Hide the canonical solution with Blind Coding Mode, explain your approach to the Live Voice Interviewer, and generate a 5-dimension L4/L5 hiring rubric evaluation.
-                  </p>
-                </div>
-
-                <div className="flex flex-wrap items-center gap-2 shrink-0">
-                  <div className="px-3 py-1.5 rounded-md border border-neutral-300 dark:border-neutral-700 font-mono text-sm font-bold tabular-nums flex items-center gap-1.5">
-                    <Clock className="w-4 h-4" />
-                    {String(Math.floor(mockSecondsLeft / 60)).padStart(2, '0')}:
-                    {String(mockSecondsLeft % 60).padStart(2, '0')}
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      const nextBlind = !mockBlindMode;
-                      setMockBlindMode(nextBlind);
-                      if (nextBlind) {
-                        setCodeMap((prev) => ({
-                          ...prev,
-                          [currentProblem.id]: {
-                            ...prev[currentProblem.id],
-                            [language]: getBlindStarterCode(currentProblem, language),
-                          },
-                        }));
-                      }
-                    }}
-                    className={`px-3 py-2 text-xs font-medium rounded-md border flex items-center gap-1.5 transition-colors ${
-                      mockBlindMode
-                        ? 'border-neutral-900 bg-neutral-900 text-white dark:border-neutral-100 dark:bg-neutral-100 dark:text-neutral-950'
-                        : 'border-neutral-300 dark:border-neutral-700 text-neutral-700 dark:text-neutral-300'
-                    }`}
-                  >
-                    <EyeOff className="w-3.5 h-3.5" />
-                    {mockBlindMode ? 'Blind Mode: ON' : 'Hide Solution (Blind Mode)'}
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      if (mockActive) {
-                        setMockActive(false);
-                      } else {
-                        setMockSecondsLeft(45 * 60);
-                        setMockScorecard(null);
-                        setMockActive(true);
-                      }
-                    }}
-                    className="px-3.5 py-2 text-xs font-medium rounded-md bg-neutral-900 text-white dark:bg-neutral-100 dark:text-neutral-950 hover:bg-neutral-800 dark:hover:bg-white transition-colors"
-                  >
-                    {mockActive ? 'Pause Timer' : 'Start 45m Mock Round'}
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setIsTutorOpen(true);
-                      setVoiceTriggerCount((c) => c + 1);
-                    }}
-                    className="px-3 py-2 text-xs font-medium rounded-md border border-neutral-300 dark:border-neutral-700 hover:bg-neutral-100 dark:hover:bg-neutral-800 flex items-center gap-1.5"
-                  >
-                    <Volume2 className="w-3.5 h-3.5" />
-                    Voice Interviewer
-                  </button>
-                  <button
-                    type="button"
-                    onClick={handleExportProgressJson}
-                    className="px-3 py-2 text-xs font-medium rounded-md border border-neutral-300 dark:border-neutral-700 hover:bg-neutral-100 dark:hover:bg-neutral-800 flex items-center gap-1.5"
-                  >
-                    <Download className="w-3.5 h-3.5" />
-                    Backup JSON
-                  </button>
-                </div>
-              </div>
-
-              <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-                <div className="lg:col-span-6 space-y-4">
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                    <div>
-                      <label className="block text-xs font-mono text-neutral-500 mb-1">
-                        Target Company Persona
-                      </label>
-                      <select
-                        value={mockCompany}
-                        onChange={(e) => setMockCompany(e.target.value)}
-                        className="w-full px-3 py-2 text-xs rounded-md border border-neutral-300 dark:border-neutral-800 bg-neutral-50 dark:bg-neutral-900"
-                      >
-                        {COMPANIES.slice(0, 30).map((c) => (
-                          <option key={c.id} value={c.name}>
-                            {c.name} ({c.tier.split(' ')[0]})
-                          </option>
-                        ))}
-                      </select>
-                    </div>
-                    <div>
-                      <label className="block text-xs font-mono text-neutral-500 mb-1">
-                        Interview Question ({PROBLEMS.length} Available)
-                      </label>
-                      <select
-                        value={currentProblem.id}
-                        onChange={(e) => setSelectedProblemId(e.target.value)}
-                        className="w-full px-3 py-2 text-xs rounded-md border border-neutral-300 dark:border-neutral-800 bg-neutral-50 dark:bg-neutral-900"
-                      >
-                        {PROBLEMS.map((p) => (
-                          <option key={p.id} value={p.id}>
-                            [{p.topicCode || `Q-${p.number}`}] {p.title}
-                          </option>
-                        ))}
-                      </select>
-                    </div>
-                  </div>
-
-                  <div>
-                    <label className="block text-xs font-mono text-neutral-500 mb-1">
-                      Candidate Pre-Coding Approach & Complexity Notes (Explain Invariant & Big-O)
-                    </label>
-                    <textarea
-                      rows={4}
-                      value={mockApproachNotes}
-                      onChange={(e) => setMockApproachNotes(e.target.value)}
-                      placeholder="Example: Use two converging pointers (left, right) in O(N) time and O(1) auxiliary heap space. Handle edge cases (empty list, single node, negative values)..."
-                      className="w-full p-3 text-xs font-mono rounded-md border border-neutral-300 dark:border-neutral-800 bg-neutral-50 dark:bg-neutral-900 focus:outline-none focus:border-neutral-900 dark:focus:border-neutral-200"
-                    />
-                  </div>
-
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setMockActive(false);
-                      const card = evaluateMockInterview({
-                        companyName: mockCompany,
-                        problem: currentProblem,
-                        language,
-                        code: activeCode,
-                        approachNotes: mockApproachNotes,
-                        elapsedSeconds: Math.max(60, 45 * 60 - mockSecondsLeft),
-                        quizCorrectCount: quizStats.correct,
-                      });
-                      setMockScorecard(card);
-                    }}
-                    className="w-full py-2.5 px-4 text-xs font-semibold rounded-md bg-neutral-900 text-white dark:bg-neutral-100 dark:text-neutral-950 hover:bg-neutral-800 dark:hover:bg-white transition-colors flex items-center justify-center gap-2"
-                  >
-                    <Award className="w-4 h-4" />
-                    Submit Round & Generate 5-Dimension Hiring Scorecard
-                  </button>
-                </div>
-
-                {/* Hiring Committee Rubric Scorecard Output */}
-                <div className="lg:col-span-6">
-                  {mockScorecard ? (
-                    <div className="p-4 rounded-md border border-neutral-900 dark:border-neutral-200 bg-neutral-50 dark:bg-neutral-900 space-y-3">
-                      <div className="flex items-center justify-between border-b border-neutral-200 dark:border-neutral-800 pb-2.5">
-                        <div>
-                          <div className="text-[11px] font-mono text-neutral-500">
-                            {mockScorecard.companyName} Hiring Committee Packet
-                          </div>
-                          <div className="text-sm font-bold text-neutral-950 dark:text-white">
-                            Verdict: {mockScorecard.verdict} ({mockScorecard.overallScore}/100)
-                          </div>
-                        </div>
-                        <span className="px-2.5 py-1 rounded text-xs font-mono font-bold bg-neutral-900 text-white dark:bg-neutral-100 dark:text-neutral-950">
-                          {LANGUAGE_LABELS[mockScorecard.language]} · {mockScorecard.elapsedMinutes}m
-                        </span>
-                      </div>
-
-                      <div className="space-y-2">
-                        {mockScorecard.dimensions.map((dim) => (
-                          <div
-                            key={dim.label}
-                            className="p-2.5 rounded border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-[#111111] text-xs"
-                          >
-                            <div className="flex items-center justify-between font-mono font-semibold text-neutral-900 dark:text-neutral-100">
-                              <span>{dim.label}</span>
-                              <span>{dim.score}/20</span>
-                            </div>
-                            <p className="text-neutral-600 dark:text-neutral-400 mt-0.5">
-                              {dim.notes}
-                            </p>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  ) : (
-                    <div className="h-full min-h-[220px] rounded-md border border-dashed border-neutral-300 dark:border-neutral-800 p-6 flex flex-col items-center justify-center text-center">
-                      <Award className="w-6 h-6 text-neutral-400 mb-2" />
-                      <div className="text-sm font-semibold text-neutral-800 dark:text-neutral-200">
-                        No Mock Scorecard Generated Yet
-                      </div>
-                      <p className="text-xs text-neutral-500 max-w-sm mt-1">
-                        Select a target company, articulate your pointer invariant and complexity analysis on the left, and click Submit Round to receive your 5-dimension (100-point) rubric breakdown.
-                      </p>
-                    </div>
-                  )}
-                </div>
-              </div>
-            </div>
+            <MockInterviewArena
+              companies={COMPANIES}
+              problems={PROBLEMS}
+              currentProblem={currentProblem}
+              language={language}
+              activeCode={activeCode}
+              mockActive={mockActive}
+              mockBlindMode={mockBlindMode}
+              mockCompany={mockCompany}
+              mockSecondsLeft={mockSecondsLeft}
+              mockApproachNotes={mockApproachNotes}
+              mockScorecard={mockScorecard}
+              mockHistory={mockHistory}
+              quizCorrectCount={quizStats.correct}
+              onSelectProblemId={(id) => {
+                const prob = PROBLEMS.find((p) => p.id === id);
+                if (!prob) return;
+                setSelectedProblemId(prob.id);
+                setCustomInput(prob.defaultInput);
+                setCustomSteps(null);
+                setStepIndex(0);
+                setMockBlindMode(false);
+              }}
+              onSelectLanguage={(lang) => {
+                setLanguage(lang);
+                setMockBlindMode(false);
+              }}
+              onCodeChange={(newCode) =>
+                setCodeMap((prev) => ({
+                  ...prev,
+                  [currentProblem.id]: {
+                    ...prev[currentProblem.id],
+                    [language]: newCode,
+                  },
+                }))
+              }
+              onToggleBlindMode={(nextBlind, nextCode) => {
+                setMockBlindMode(nextBlind);
+                setCodeMap((prev) => ({
+                  ...prev,
+                  [currentProblem.id]: {
+                    ...prev[currentProblem.id],
+                    [language]: nextCode,
+                  },
+                }));
+              }}
+              onToggleTimer={() => {
+                if (mockActive) {
+                  setMockActive(false);
+                } else {
+                  setMockSecondsLeft(45 * 60);
+                  setMockScorecard(null);
+                  setMockActive(true);
+                }
+              }}
+              onChangeCompany={setMockCompany}
+              onChangeApproachNotes={setMockApproachNotes}
+              onScoreGenerated={(card) => {
+                setMockActive(false);
+                setMockScorecard(card);
+                setMockHistory((prev) => [card, ...prev].slice(0, 15));
+              }}
+              onSelectHistoryCard={(card) => setMockScorecard(card)}
+              onClearHistory={() => setMockHistory([])}
+              onOpenVoiceInterviewer={() => {
+                setIsTutorOpen(true);
+                setVoiceTriggerCount((c) => c + 1);
+              }}
+              onOpenInVisualizer={() => setActiveTab('visualizer')}
+              onExportBackup={handleExportProgressJson}
+            />
           </div>
         )}
       </main>

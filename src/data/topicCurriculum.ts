@@ -118,9 +118,10 @@ const TOPIC_QUESTION_SPECS: Record<CoreTopic, TopicSeedSpec[]> = {
       fnName: 'compactNonZero',
     },
     {
+      id: 'sort-colors-dutch-flag',
       title: 'Dutch National Flag Three-Way Color Partition',
       difficulty: 'Medium',
-      traceFamilyId: 'three-sum-zero',
+      traceFamilyId: 'sort-colors-dutch-flag',
       defaultInput: '2, 0, 2, 1, 1, 0',
       summary: 'Partition an array of 0s, 1s, and 2s in a single pass using low, mid, and high boundary pointers.',
       keyInsight: 'Maintain three regions: [0..low-1]=0, [low..mid-1]=1, and [high+1..n-1]=2 while mid scans the unclassified frontier.',
@@ -260,16 +261,6 @@ const TOPIC_QUESTION_SPECS: Record<CoreTopic, TopicSeedSpec[]> = {
       summary: 'Locate the array index where the sum of elements strictly to its left equals the sum strictly to its right.',
       keyInsight: 'Maintain leftSum in a single register while rightSum = totalSum - leftSum - nums[i] in O(1) space.',
       fnName: 'findEquilibriumPivot',
-    },
-    {
-      id: 'container-most-water',
-      title: 'Container With Most Water (Greedy Two-Pointer Contraction)',
-      difficulty: 'Medium',
-      traceFamilyId: 'container-most-water',
-      defaultInput: '1, 8, 6, 2, 5, 4, 8, 3, 7',
-      summary: 'Compute the maximum water bounded by vertical line heights using inward pointer contraction.',
-      keyInsight: 'Always advancing the shorter height line inward is strictly optimal because moving the taller line can only decrease width without height gain.',
-      fnName: 'maxWaterContainer',
     },
     {
       id: 'arr-22-rotateimageinplace',
@@ -669,10 +660,11 @@ const TOPIC_QUESTION_SPECS: Record<CoreTopic, TopicSeedSpec[]> = {
       fnName: 'countPalindromicSpans',
     },
     {
+      id: 'kadane-max-subarray',
       title: 'Maximum Subarray Kadane Running Sum Invariant',
       difficulty: 'Medium',
-      traceFamilyId: 'coin-change-dp',
-      defaultInput: 'coins=[1, 3, 4] | amount=6',
+      traceFamilyId: 'kadane-max-subarray',
+      defaultInput: '-2, 1, -3, 4, -1, 2, 1, -5, 4',
       summary: 'Compute the contiguous subarray with the largest sum in O(N) time by resetting negative running sums to the current element.',
       keyInsight: 'Whenever curSum < 0, extending the previous prefix reduces any future sum, so start fresh at nums[i].',
       fnName: 'kadaneMaxSubarray',
@@ -822,10 +814,11 @@ const TOPIC_QUESTION_SPECS: Record<CoreTopic, TopicSeedSpec[]> = {
       fnName: 'canCompleteCircuit',
     },
     {
+      id: 'merge-intervals-greedy',
       title: 'Merge Overlapping Intervals (Sweep-Line Sort & Extend)',
       difficulty: 'Medium',
-      traceFamilyId: 'container-most-water',
-      defaultInput: '1, 3, 2, 6, 8, 10, 15',
+      traceFamilyId: 'merge-intervals-greedy',
+      defaultInput: '[1,3], [2,6], [8,10], [15,18]',
       summary: 'Sort intervals by start time and greedily coalesce any interval whose start <= previous end.',
       keyInsight: 'Sorting by start time guarantees that mergeable intervals appear contiguously in the array.',
       fnName: 'mergeIntervalsGreedy',
@@ -1984,7 +1977,8 @@ function getCompaniesForProblem(globalNum: number, topic: CoreTopic, problemId: 
     'two-sum-hash', 'trapping-rain-water', 'three-sum-zero', 'reverse-linked-list',
     'lru-cache-pointers', 'valid-parentheses-stack', 'course-schedule-cycle',
     'binary-tree-level-order', 'longest-substring-unique', 'coin-change-dp',
-    'container-most-water', 'search-rotated-sorted'
+    'container-most-water', 'search-rotated-sorted',
+    'sort-colors-dutch-flag', 'kadane-max-subarray', 'merge-intervals-greedy'
   ];
   if (UNIVERSAL_STAPLES.includes(problemId)) {
     FAANG_COMPANIES.forEach((c) => set.add(c));
@@ -2020,30 +2014,92 @@ function getCompaniesForProblem(globalNum: number, topic: CoreTopic, problemId: 
   return Array.from(set);
 }
 
+const REDUNDANT_CLONE_IDS = new Set([
+  'll-21-mergetwosortedlists',
+  'll-22-swapnodesinpairs',
+  'll-23-rotatelistrightk',
+  'll-24-partitionlistpivot',
+  'll-25-copylistrandompointer',
+  'dp-21-maxsubarraykadane',
+  'dp-22-uniquegridpaths',
+  'dp-23-houserobbercircular',
+  'dp-24-targetsumsubsetdiff',
+  'dp-25-maximalbinarysquare',
+  'grd-21-mergeoverlappingintervals',
+  'grd-22-insertintervalsorted',
+  'grd-23-nonoverlappingintervals',
+  'grd-24-gasstationcirculartank',
+  'grd-25-meetingroomspeak',
+  'sw-21-longestuniquesubstr',
+  'sw-22-minwindowsubstring',
+  'sw-23-longestrepeatreplace',
+  'sw-24-permutationinstring',
+  'sw-25-slidingwindowmaxdeque',
+  'stk-21-validparentheseslifo',
+  'stk-22-minstackregister',
+  'stk-23-dailytemperaturesmonotonic',
+  'stk-24-largestrecthistogram',
+  'stk-25-evaluaterpnpostfix',
+  'tr-21-validatebstbounds',
+  'tr-22-lowestcommonancestortree',
+  'tr-23-maxpathsumbinarytree',
+  'tr-24-topkfrequentelements',
+  'tr-25-findmediandatastream',
+  'gr-21-numislandsmulti',
+  'gr-22-coursescheduleiiorder',
+  'gr-23-rottingorangesmultisource',
+  'gr-24-wordladderbibfs',
+  'gr-25-mediantwosortedarrays',
+]);
+
+function normalizeTitleKey(title: string): string {
+  return title
+    .split('(')[0]
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, ' ')
+    .trim();
+}
+
 /**
- * Generates the complete 200-problem curriculum (8 Topics x 25 Problems each),
- * merging the rich canonical definitions from BASE_PROBLEMS where IDs match and
- * synthesizing full Python/Java solutions, constraints, and trace metadata for all 200 items.
+ * Generates the deduplicated topic curriculum across all 8 Core Topics,
+ * merging the 15 canonical 1:1 traced BASE_PROBLEMS (traceMode: 'native')
+ * and clearly labeling pattern-practice entries (traceMode: 'pattern-template').
  */
 export function buildFullTopicCurriculum(baseProblems: AlgorithmProblem[]): AlgorithmProblem[] {
   const baseById = new Map<string, AlgorithmProblem>();
   baseProblems.forEach((p) => baseById.set(p.id, p));
 
   const allProblems: AlgorithmProblem[] = [];
+  const seenIds = new Set<string>();
+  const seenTitleKeys = new Set<string>();
   let globalNumber = 1;
 
   for (const topicMeta of CORE_TOPICS) {
     const specs = TOPIC_QUESTION_SPECS[topicMeta.id];
-    specs.forEach((spec, idx) => {
-      const topicIndex = idx + 1;
+    let topicIndex = 0;
+
+    specs.forEach((spec, rawIdx) => {
+      const candidateId =
+        spec.id ||
+        `${topicMeta.codePrefix.toLowerCase()}-${String(rawIdx + 1).padStart(2, '0')}-${spec.fnName.toLowerCase()}`;
+
+      if (REDUNDANT_CLONE_IDS.has(candidateId)) return;
+
+      const titleKey = normalizeTitleKey(spec.title);
+      if (seenIds.has(candidateId) || seenTitleKeys.has(titleKey)) return;
+
+      seenIds.add(candidateId);
+      seenTitleKeys.add(titleKey);
+      topicIndex += 1;
+
       const paddedIdx = String(topicIndex).padStart(2, '0');
       const topicCode = `${topicMeta.codePrefix}-${paddedIdx}`;
-      const problemId =
-        spec.id ||
-        `${topicMeta.codePrefix.toLowerCase()}-${paddedIdx}-${spec.fnName.toLowerCase()}`;
+      const problemId = candidateId;
 
       const existingBase = baseById.get(problemId);
       const fallbackTemplate = baseById.get(spec.traceFamilyId) || baseProblems[0];
+      const templateShortTitle = fallbackTemplate.title.split('(')[0].trim();
 
       if (existingBase) {
         allProblems.push({
@@ -2053,8 +2109,15 @@ export function buildFullTopicCurriculum(baseProblems: AlgorithmProblem[]): Algo
           topic: topicMeta.id,
           topicIndex,
           traceFamilyId: spec.traceFamilyId,
+          traceMode: 'native',
+          traceTemplateTitle: undefined,
           pattern: topicMeta.id,
-          companies: Array.from(new Set([...existingBase.companies, ...getCompaniesForProblem(globalNumber, topicMeta.id, problemId)])),
+          companies: Array.from(
+            new Set([
+              ...existingBase.companies,
+              ...getCompaniesForProblem(globalNumber, topicMeta.id, problemId),
+            ])
+          ),
         });
       } else {
         const companyGroup = getCompaniesForProblem(globalNumber, topicMeta.id, problemId);
@@ -2065,12 +2128,14 @@ export function buildFullTopicCurriculum(baseProblems: AlgorithmProblem[]): Algo
           topic: topicMeta.id,
           topicIndex,
           traceFamilyId: spec.traceFamilyId,
+          traceMode: 'pattern-template',
+          traceTemplateTitle: templateShortTitle,
           title: spec.title,
           slug: problemId,
           difficulty: spec.difficulty,
           pattern: topicMeta.id,
           summary: spec.summary,
-          description: `${spec.summary} Step through each line of execution using the Next Line button to inspect how stack frames, heap cells, and pointers evolve in memory.`,
+          description: `${spec.summary} Step through each line of execution using the playback bar to inspect how stack frames, heap cells, and pointers evolve in memory.`,
           constraints: [
             '1 <= N <= 10^5 input elements',
             'Must maintain strict pointer and loop invariants at every step.',

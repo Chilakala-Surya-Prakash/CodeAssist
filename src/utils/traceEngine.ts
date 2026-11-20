@@ -11,6 +11,7 @@ function parseNumberList(raw: string, fallback: number[]): number[] {
 }
 
 import { PROBLEMS } from '../data/problems';
+import { clampToExecutableLine } from './traceLineMap';
 
 /**
  * Generates a full step-by-step execution trace with Stack Frames, Heap Allocations,
@@ -68,26 +69,42 @@ export function generateExecutionTrace(problemId: string, rawInput?: string): Ex
     case 'container-most-water':
       rawSteps = traceContainerMostWater(effectiveInput || '1, 8, 6, 2, 5, 4, 8, 3, 7');
       break;
+    case 'sort-colors-dutch-flag':
+      rawSteps = traceSortColorsDutchFlag(effectiveInput || '2, 0, 2, 1, 1, 0');
+      break;
+    case 'kadane-max-subarray':
+      rawSteps = traceKadaneMaxSubarray(effectiveInput || '-2, 1, -3, 4, -1, 2, 1, -5, 4');
+      break;
+    case 'merge-intervals-greedy':
+      rawSteps = traceMergeIntervalsGreedy(effectiveInput || '[1,3], [2,6], [8,10], [15,18]');
+      break;
     default:
       rawSteps = traceReverseLinkedList(effectiveInput || '10 -> 20 -> 30 -> 40');
       break;
   }
 
-  return ensureGranularLineByLineTrace(matchedProblem?.python.code, rawSteps);
+  return ensureGranularLineByLineTrace(
+    matchedProblem?.python.code,
+    matchedProblem?.java.code,
+    rawSteps
+  );
 }
 
 /**
  * Ensures that EVERY problem trace:
  * 1. Always starts at Line 1 (Function Signature Entry) on Step 1 (stepIndex: 0).
- * 2. Steps sequentially through initialization lines (Line 2, Line 3, ...) before entering the loop.
+ * 2. Steps sequentially through active initialization lines while skipping untaken guard bodies (e.g. `if not root: return []`).
  * 3. Steps through loop condition/header lines before executing loop body mutations.
+ * 4. Clamps every step's pythonLine and javaLine to real, executable lines within source bounds.
  */
 function ensureGranularLineByLineTrace(
   pythonCode: string | undefined,
+  javaCode: string | undefined,
   rawSteps: ExecutionStep[]
 ): ExecutionStep[] {
   if (rawSteps.length === 0) return rawSteps;
   const codeLines = (pythonCode || '').split('\n');
+  const javaLines = (javaCode || '').split('\n');
   const firstStep = rawSteps[0];
   const expanded: ExecutionStep[] = [];
 
@@ -101,16 +118,34 @@ function ensureGranularLineByLineTrace(
     }
   }
 
-  // 1. If firstStep does not start at Line 1, prepend Line 1..min(firstStep.pythonLine - 1, loopHeaderLine > 1 ? loopHeaderLine - 1 : 3)
+  // 1. If firstStep does not start at Line 1, prepend Line 1..initLimit while skipping untaken `if ...:` guard bodies
   if (firstStep.pythonLine > 1 && codeLines.length > 0) {
     const initLimit =
       loopHeaderLine > 1
         ? Math.min(firstStep.pythonLine - 1, loopHeaderLine - 1)
         : Math.min(firstStep.pythonLine - 1, 3);
 
+    let skipIndentAbove: number | null = null;
     for (let ln = 1; ln <= initLimit; ln++) {
-      const srcLine = (codeLines[ln - 1] || '').trim();
+      const rawLine = codeLines[ln - 1] || '';
+      const srcLine = rawLine.trim();
+      const indent = rawLine.length - rawLine.trimStart().length;
+
       if (!srcLine || srcLine.startsWith('#')) continue;
+
+      // Skip deeper-indented lines inside an untaken early-return guard (e.g. `if not root:\n    return []`)
+      if (skipIndentAbove !== null) {
+        if (indent > skipIndentAbove) continue;
+        skipIndentAbove = null;
+      }
+
+      const isGuardCheck = /^if\s+.+:\s*$/.test(srcLine);
+      if (isGuardCheck) {
+        skipIndentAbove = indent;
+      }
+
+      // Skip standalone inline guard returns like `if not root: return []` on non-empty inputs
+      if (/^return\b/.test(srcLine)) continue;
 
       const isFnEntry = ln === 1;
       expanded.push({
@@ -118,15 +153,21 @@ function ensureGranularLineByLineTrace(
         stepIndex: expanded.length,
         pythonLine: ln,
         javaLine: Math.max(1, ln),
-        operationType: isFnEntry ? 'PUSH_STACK_FRAME' : 'INIT_POINTER',
+        operationType: isFnEntry ? 'PUSH_STACK_FRAME' : isGuardCheck ? 'COMPARE_VALUES' : 'INIT_POINTER',
         title: isFnEntry
           ? `Line 1: Enter Function \`${srcLine.replace(/:$/, '')}\` & Push Call Stack Frame`
+          : isGuardCheck
+          ? `Line ${ln}: Check Base Guard \`${srcLine}\` (False — Continue)`
           : `Line ${ln}: Execute \`${srcLine}\` — Initialize Register / Heap State`,
         intuition: isFnEntry
           ? `Push stack frame ${firstStep.stackFrames[0]?.functionName || 'main()'} onto the call stack and bind the input heap reference parameters before executing Line 2.`
+          : isGuardCheck
+          ? `Evaluate base-case guard \`${srcLine}\` on Line ${ln}. The input is non-empty, so the early-return branch is skipped.`
           : `Execute initialization statement \`${srcLine}\` on Line ${ln} to prepare local stack registers before entering the main loop.`,
         memoryMutation: isFnEntry
           ? `Call stack frame allocated at ${firstStep.stackFrames[0]?.returnAddress || '0x7FFF0010'}.`
+          : isGuardCheck
+          ? `Guard evaluated False — skipping early-return branch.`
           : `Initialized register state on Line ${ln}: ${srcLine}`,
       });
     }
@@ -168,9 +209,12 @@ function ensureGranularLineByLineTrace(
     });
   });
 
+  // 3. Clamp every step's pythonLine and javaLine to valid, non-blank executable source lines
   return expanded.map((s, idx) => ({
     ...s,
     stepIndex: idx,
+    pythonLine: codeLines.length > 0 ? clampToExecutableLine(s.pythonLine, codeLines) : Math.max(1, s.pythonLine),
+    javaLine: javaLines.length > 0 ? clampToExecutableLine(s.javaLine, javaLines) : Math.max(1, s.javaLine),
   }));
 }
 
@@ -975,7 +1019,7 @@ function traceBinaryTreeBFS(rawInput: string): ExecutionStep[] {
     const queueObj: HeapObject = {
       id: 'heap-queue',
       address: '0x5400',
-      type: 'GraphQueue',
+      type: 'Queue',
       label: `FIFO Deque<TreeNode*> (${queueIndices.length} queued)`,
       byteSize: 64,
       refCount: 1,
@@ -2390,6 +2434,571 @@ function traceContainerMostWater(rawInput: string): ExecutionStep[] {
     if (moveLeft) left++;
     else right--;
   }
+
+  return steps;
+}
+
+// 16. Dutch National Flag Three-Way Color Partition (0s, 1s, 2s in-place)
+function traceSortColorsDutchFlag(rawInput: string): ExecutionStep[] {
+  const parsed = parseNumberList(rawInput, [2, 0, 2, 1, 1, 0]).slice(0, 10);
+  const nums = parsed.map((v) => Math.max(0, Math.min(2, Math.abs(v) % 3)));
+  const n = nums.length;
+  const baseAddr = 0xA100;
+  let low = 0;
+  let mid = 0;
+  let high = n - 1;
+  let swaps = 0;
+  let comparisons = 0;
+  const steps: ExecutionStep[] = [];
+
+  const colorTag = (v: number) => (v === 0 ? '0 (Red)' : v === 1 ? '1 (White)' : '2 (Blue)');
+
+  const makeStep = (
+    title: string,
+    pyLine: number,
+    javaLine: number,
+    op: ExecutionStep['operationType'],
+    intuition: string,
+    mutation: string,
+    mutatedIndices: number[] = [],
+    stdout?: string
+  ) => {
+    const pointers: PointerRef[] = [];
+    if (low < n) {
+      pointers.push({
+        id: 'p-low',
+        name: 'low',
+        targetObjectId: 'heap-dutch',
+        targetIndex: low,
+        targetAddress: hexAddr(baseAddr, low * 4),
+        role: 'secondary',
+      });
+    }
+    if (mid < n) {
+      pointers.push({
+        id: 'p-mid',
+        name: 'mid',
+        targetObjectId: 'heap-dutch',
+        targetIndex: mid,
+        targetAddress: hexAddr(baseAddr, mid * 4),
+        role: 'primary',
+      });
+    }
+    if (high >= 0 && high < n) {
+      pointers.push({
+        id: 'p-high',
+        name: 'high',
+        targetObjectId: 'heap-dutch',
+        targetIndex: high,
+        targetAddress: hexAddr(baseAddr, high * 4),
+        role: 'anchor',
+      });
+    }
+
+    steps.push({
+      stepIndex: steps.length,
+      title,
+      pythonLine: pyLine,
+      javaLine,
+      operationType: op,
+      intuition,
+      memoryMutation: mutation,
+      invariantCheck: `[0..${low - 1}]=0 | [${low}..${mid - 1}]=1 | [${mid}..${high}]=unknown | [${high + 1}..${n - 1}]=2`,
+      stdout,
+      stackFrames: [
+        {
+          id: 'frame-dutch',
+          functionName: 'sortColors(nums)',
+          line: pyLine,
+          returnAddress: '0x7FFF01A0',
+          isActive: true,
+          variables: [
+            { name: 'low', value: String(low), type: 'int', address: '0x7FFF0A00', isPointer: true, pointsToAddress: low < n ? hexAddr(baseAddr, low * 4) : 'END', changed: op === 'MUTATE_MEMORY' },
+            { name: 'mid', value: String(mid), type: 'int', address: '0x7FFF0A04', isPointer: true, pointsToAddress: mid < n ? hexAddr(baseAddr, mid * 4) : 'END', changed: true },
+            { name: 'high', value: String(high), type: 'int', address: '0x7FFF0A08', isPointer: true, pointsToAddress: high >= 0 ? hexAddr(baseAddr, high * 4) : 'END', changed: op === 'MUTATE_MEMORY' },
+            { name: 'swaps', value: String(swaps), type: 'int', address: '0x7FFF0A0C', isPointer: false, changed: op === 'MUTATE_MEMORY' },
+          ],
+        },
+      ],
+      heapObjects: [
+        {
+          id: 'heap-dutch',
+          address: hexAddr(baseAddr, 0),
+          type: 'Array',
+          label: `int[] nums — 3-Way Partition Buffer (swaps=${swaps})`,
+          byteSize: n * 4,
+          refCount: 1,
+          gcStatus: mutatedIndices.length > 0 ? 'mutated' : 'allocated',
+          cells: nums.map((val, idx) => ({
+            index: idx,
+            label: `[${idx}]`,
+            value: val,
+            addressOffset: hexAddr(baseAddr, idx * 4),
+            status: mutatedIndices.includes(idx)
+              ? 'mutated'
+              : idx === mid && mid <= high
+              ? 'active'
+              : idx < low || idx > high
+              ? 'visited'
+              : 'idle',
+            annotation: idx < low ? '0-zone' : idx > high ? '2-zone' : idx < mid ? '1-zone' : 'scan',
+          })),
+        },
+      ],
+      pointers,
+      metrics: {
+        comparisons,
+        pointerOps: swaps + steps.length,
+        heapBytesUsed: n * 4,
+        timeStepO: `swaps=${swaps}`,
+      },
+    });
+  };
+
+  makeStep(
+    `Initialize low=0, mid=0, high=${high} on [${nums.join(', ')}]`,
+    2,
+    3,
+    'INIT_POINTER',
+    `Start with all ${n} slots unclassified in [mid..high] = [0..${high}]. Pointers low and mid begin at 0; high begins at ${high}.`,
+    `low = 0, mid = 0, high = ${high}`,
+    []
+  );
+
+  while (mid <= high) {
+    comparisons++;
+    const val = nums[mid];
+    if (val === 0) {
+      const a = low;
+      const b = mid;
+      const tmp = nums[a];
+      nums[a] = nums[b];
+      nums[b] = tmp;
+      swaps++;
+      low++;
+      mid++;
+      makeStep(
+        `nums[${b}] == 0 → Swap [${a}] ↔ [${b}], low→${low}, mid→${mid}`,
+        5,
+        6,
+        'MUTATE_MEMORY',
+        `Found ${colorTag(0)} at mid=${b}. Swap with nums[low=${a}] to grow the 0-zone [0..${low - 1}], then advance both low and mid.`,
+        `swap(nums[${a}], nums[${b}]); low=${low}, mid=${mid}`,
+        [a, b],
+        `Array: [${nums.join(', ')}]`
+      );
+    } else if (val === 1) {
+      const prevMid = mid;
+      mid++;
+      makeStep(
+        `nums[${prevMid}] == 1 → Keep in 1-zone, advance mid→${mid}`,
+        9,
+        10,
+        'MOVE_POINTER',
+        `Found ${colorTag(1)} at mid=${prevMid}. It already belongs in the middle 1-zone [${low}..${mid - 1}], so simply advance mid++.`,
+        `mid = ${mid} (no swap required)`,
+        [],
+        `Array: [${nums.join(', ')}]`
+      );
+    } else {
+      const a = mid;
+      const b = high;
+      const tmp = nums[a];
+      nums[a] = nums[b];
+      nums[b] = tmp;
+      swaps++;
+      high--;
+      makeStep(
+        `nums[${a}] == 2 → Swap [${a}] ↔ [${b}], high→${high} (hold mid=${mid})`,
+        11,
+        12,
+        'MUTATE_MEMORY',
+        `Found ${colorTag(2)} at mid=${a}. Swap with nums[high=${b}] to grow the 2-zone [${high + 1}..${n - 1}]. Keep mid=${mid} stationary because the swapped value (${nums[mid]}) has not been inspected yet!`,
+        `swap(nums[${a}], nums[${b}]); high=${high}`,
+        [a, b],
+        `Array: [${nums.join(', ')}]`
+      );
+    }
+  }
+
+  makeStep(
+    `Partition Complete (mid=${mid} > high=${high}) → [${nums.join(', ')}]`,
+    13,
+    15,
+    'RETURN_RESULT',
+    `Pointers mid (${mid}) and high (${high}) crossed, confirming zero unclassified slots remain. All 0s, 1s, and 2s are partitioned in-place in ${swaps} swaps.`,
+    `Return [${nums.join(', ')}]`,
+    [],
+    `Partitioned: [${nums.join(', ')}]`
+  );
+
+  return steps;
+}
+
+// 17. Maximum Subarray (Kadane's Algorithm — O(1) Register Compression)
+function traceKadaneMaxSubarray(rawInput: string): ExecutionStep[] {
+  const nums = parseNumberList(rawInput, [-2, 1, -3, 4, -1, 2, 1, -5, 4]).slice(0, 12);
+  const n = nums.length;
+  const baseAddr = 0xA400;
+  let curSum = nums[0];
+  let bestSum = nums[0];
+  let winStart = 0;
+  let bestStart = 0;
+  let bestEnd = 0;
+  const steps: ExecutionStep[] = [];
+
+  const pushKadaneStep = (
+    idx: number,
+    title: string,
+    pyLine: number,
+    javaLine: number,
+    op: ExecutionStep['operationType'],
+    intuition: string,
+    mutation: string,
+    resetHappened: boolean,
+    stdout?: string
+  ) => {
+    steps.push({
+      stepIndex: steps.length,
+      title,
+      pythonLine: pyLine,
+      javaLine,
+      operationType: op,
+      intuition,
+      memoryMutation: mutation,
+      invariantCheck: `cur_sum=${curSum} over [${winStart}..${idx}] | global best_sum=${bestSum} over [${bestStart}..${bestEnd}]`,
+      stdout,
+      stackFrames: [
+        {
+          id: 'frame-kadane',
+          functionName: 'maxSubArray(nums)',
+          line: pyLine,
+          returnAddress: '0x7FFF01D0',
+          isActive: true,
+          variables: [
+            { name: 'i', value: String(idx), type: 'int', address: '0x7FFF0D00', isPointer: true, pointsToAddress: hexAddr(baseAddr, idx * 4), changed: true },
+            { name: 'cur_sum', value: String(curSum), type: 'int', address: '0x7FFF0D04', isPointer: false, changed: true },
+            { name: 'best_sum', value: String(bestSum), type: 'int', address: '0x7FFF0D08', isPointer: false, changed: curSum === bestSum },
+            { name: 'best_span', value: `[${bestStart}..${bestEnd}]`, type: 'range', address: '0x7FFF0D0C', isPointer: false, changed: curSum === bestSum },
+          ],
+        },
+      ],
+      heapObjects: [
+        {
+          id: 'heap-kadane',
+          address: hexAddr(baseAddr, 0),
+          type: 'Array',
+          label: `int[] nums — Kadane Active Span [${winStart}..${idx}] (Best = ${bestSum})`,
+          byteSize: n * 4,
+          refCount: 1,
+          gcStatus: resetHappened ? 'mutated' : 'allocated',
+          cells: nums.map((val, cIdx) => ({
+            index: cIdx,
+            label: `[${cIdx}]`,
+            value: val,
+            addressOffset: hexAddr(baseAddr, cIdx * 4),
+            status:
+              cIdx === idx
+                ? resetHappened
+                  ? 'mutated'
+                  : 'active'
+                : cIdx >= winStart && cIdx < idx
+                ? 'visited'
+                : cIdx >= bestStart && cIdx <= bestEnd
+                ? 'visited'
+                : 'idle',
+            annotation:
+              cIdx >= bestStart && cIdx <= bestEnd
+                ? `best[${bestStart}..${bestEnd}]`
+                : cIdx >= winStart && cIdx <= idx
+                ? 'cur_window'
+                : '',
+          })),
+        },
+      ],
+      pointers: [
+        {
+          id: 'p-win-start',
+          name: 'start',
+          targetObjectId: 'heap-kadane',
+          targetIndex: winStart,
+          targetAddress: hexAddr(baseAddr, winStart * 4),
+          role: 'secondary',
+        },
+        {
+          id: 'p-i',
+          name: 'i',
+          targetObjectId: 'heap-kadane',
+          targetIndex: idx,
+          targetAddress: hexAddr(baseAddr, idx * 4),
+          role: 'primary',
+        },
+      ],
+      metrics: {
+        comparisons: steps.length + 1,
+        pointerOps: idx + 1,
+        heapBytesUsed: n * 4,
+        timeStepO: `Best=${bestSum}`,
+      },
+    });
+  };
+
+  pushKadaneStep(
+    0,
+    `Seed DP Registers: cur_sum = best_sum = nums[0] (${nums[0]})`,
+    2,
+    3,
+    'INIT_POINTER',
+    `Initialize Kadane scalar registers cur_sum and best_sum from index 0 (${nums[0]}). Zero O(N) DP heap array needed.`,
+    `cur_sum = ${curSum}, best_sum = ${bestSum}`,
+    false,
+    `cur_sum=${curSum} | best_sum=${bestSum}`
+  );
+
+  for (let i = 1; i < n; i++) {
+    const val = nums[i];
+    const extended = curSum + val;
+    const shouldReset = extended < val;
+    if (shouldReset) {
+      curSum = val;
+      winStart = i;
+    } else {
+      curSum = extended;
+    }
+    const improvedBest = curSum > bestSum;
+    if (improvedBest) {
+      bestSum = curSum;
+      bestStart = winStart;
+      bestEnd = i;
+    }
+
+    pushKadaneStep(
+      i,
+      shouldReset
+        ? `i=${i} (val=${val}): Discard Negative Prefix → Reset cur_sum=${curSum}${improvedBest ? ` · New Best=${bestSum}` : ''}`
+        : `i=${i} (val=${val}): Extend Prefix → cur_sum=${curSum}${improvedBest ? ` · New Best=${bestSum}` : ''}`,
+      shouldReset ? 6 : 8,
+      6,
+      shouldReset ? 'MUTATE_MEMORY' : 'COMPARE_VALUES',
+      shouldReset
+        ? `Extending previous sum (${extended}) is worse than starting fresh at nums[${i}]=${val}. Reset subarray window start to ${i}.`
+        : `Extending active subarray [${winStart}..${i}] yields cur_sum=${curSum} >= nums[${i}]=${val}.${improvedBest ? ` Beats previous best → best_sum=${bestSum}.` : ''}`,
+      `cur_sum = ${curSum}; best_sum = ${bestSum}`,
+      shouldReset,
+      `Best=${bestSum} ([${nums.slice(bestStart, bestEnd + 1).join(', ')}])`
+    );
+  }
+
+  pushKadaneStep(
+    n - 1,
+    `Return Global Maximum Subarray Sum = ${bestSum}`,
+    11,
+    11,
+    'RETURN_RESULT',
+    `Completed single O(N) pass in O(1) space. Optimal contiguous subarray is nums[${bestStart}..${bestEnd}] = [${nums.slice(bestStart, bestEnd + 1).join(', ')}] with sum ${bestSum}.`,
+    `Return ${bestSum}`,
+    false,
+    `Max Sum: ${bestSum} (subarray [${nums.slice(bestStart, bestEnd + 1).join(', ')}])`
+  );
+
+  return steps;
+}
+
+// 18. Merge Overlapping Intervals (Sweep-Line Sort & In-Place End Extension)
+function traceMergeIntervalsGreedy(rawInput: string): ExecutionStep[] {
+  const pairRegex = /\[\s*(-?\d+)\s*,\s*(-?\d+)\s*\]/g;
+  const parsedPairs: [number, number][] = [];
+  let match: RegExpExecArray | null;
+  while ((match = pairRegex.exec(rawInput)) !== null) {
+    const a = Number(match[1]);
+    const b = Number(match[2]);
+    parsedPairs.push([Math.min(a, b), Math.max(a, b)]);
+  }
+
+  if (parsedPairs.length === 0) {
+    const flat = parseNumberList(rawInput, [1, 3, 2, 6, 8, 10, 15, 18]);
+    for (let i = 0; i + 1 < flat.length; i += 2) {
+      parsedPairs.push([Math.min(flat[i], flat[i + 1]), Math.max(flat[i], flat[i + 1])]);
+    }
+  }
+  if (parsedPairs.length === 0) {
+    parsedPairs.push([1, 3], [2, 6], [8, 10], [15, 18]);
+  }
+
+  const sorted = parsedPairs
+    .slice(0, 8)
+    .map((p): [number, number] => [p[0], p[1]])
+    .sort((a, b) => a[0] - b[0] || a[1] - b[1]);
+
+  const baseIn = 0xB200;
+  const baseOut = 0xB400;
+  const merged: [number, number][] = [[sorted[0][0], sorted[0][1]]];
+  const steps: ExecutionStep[] = [];
+  let comparisons = 0;
+  let mergesCount = 0;
+
+  const fmtIv = (iv: [number, number]) => `[${iv[0]}, ${iv[1]}]`;
+  const fmtList = (list: [number, number][]) => `[${list.map(fmtIv).join(', ')}]`;
+
+  const pushIntervalStep = (
+    scanIdx: number,
+    title: string,
+    pyLine: number,
+    javaLine: number,
+    op: ExecutionStep['operationType'],
+    intuition: string,
+    mutation: string,
+    extendedTail: boolean,
+    stdout?: string
+  ) => {
+    const lastIdx = merged.length - 1;
+    steps.push({
+      stepIndex: steps.length,
+      title,
+      pythonLine: pyLine,
+      javaLine,
+      operationType: op,
+      intuition,
+      memoryMutation: mutation,
+      invariantCheck: `Merged output is strictly disjoint & sorted: ${fmtList(merged)}`,
+      stdout,
+      stackFrames: [
+        {
+          id: 'frame-intervals',
+          functionName: 'merge(intervals)',
+          line: pyLine,
+          returnAddress: '0x7FFF0220',
+          isActive: true,
+          variables: [
+            { name: 'i', value: String(scanIdx), type: 'int', address: '0x7FFF0E00', isPointer: true, pointsToAddress: hexAddr(baseIn, scanIdx * 8), changed: true },
+            { name: 'curr', value: fmtIv(sorted[scanIdx]), type: 'int[2]', address: '0x7FFF0E04', isPointer: false, changed: true },
+            { name: 'last_end', value: String(merged[lastIdx][1]), type: 'int', address: '0x7FFF0E08', isPointer: false, changed: extendedTail },
+            { name: 'merged_len', value: String(merged.length), type: 'int', address: '0x7FFF0E0C', isPointer: false, changed: !extendedTail },
+          ],
+        },
+      ],
+      heapObjects: [
+        {
+          id: 'heap-intervals-in',
+          address: hexAddr(baseIn, 0),
+          type: 'Array',
+          label: `Sorted Input Intervals (${sorted.length} spans)`,
+          byteSize: sorted.length * 8,
+          refCount: 1,
+          gcStatus: 'allocated',
+          cells: sorted.map((iv, idx) => ({
+            index: idx,
+            label: `[${idx}]`,
+            value: `[${iv[0]},${iv[1]}]`,
+            addressOffset: hexAddr(baseIn, idx * 8),
+            status: idx === scanIdx ? 'active' : idx < scanIdx ? 'visited' : 'idle',
+            annotation: idx === scanIdx ? 'active' : idx < scanIdx ? 'done' : 'queued',
+          })),
+        },
+        {
+          id: 'heap-intervals-out',
+          address: hexAddr(baseOut, 0),
+          type: 'Array',
+          label: `Merged Disjoint Output (${merged.length} spans, ${mergesCount} merges)`,
+          byteSize: merged.length * 8,
+          refCount: 1,
+          gcStatus: extendedTail ? 'mutated' : 'allocated',
+          cells: merged.map((iv, idx) => ({
+            index: idx,
+            label: `[${idx}]`,
+            value: `[${iv[0]},${iv[1]}]`,
+            addressOffset: hexAddr(baseOut, idx * 8),
+            status: idx === lastIdx ? (extendedTail ? 'mutated' : 'active') : 'visited',
+            annotation: idx === lastIdx ? `end=${iv[1]}` : 'merged',
+          })),
+        },
+      ],
+      pointers: [
+        {
+          id: 'p-iv-scan',
+          name: 'curr',
+          targetObjectId: 'heap-intervals-in',
+          targetIndex: scanIdx,
+          targetAddress: hexAddr(baseIn, scanIdx * 8),
+          role: 'primary',
+        },
+        {
+          id: 'p-iv-last',
+          name: 'last',
+          targetObjectId: 'heap-intervals-out',
+          targetIndex: lastIdx,
+          targetAddress: hexAddr(baseOut, lastIdx * 8),
+          role: 'secondary',
+        },
+      ],
+      metrics: {
+        comparisons,
+        pointerOps: steps.length + 1,
+        heapBytesUsed: (sorted.length + merged.length) * 8,
+        timeStepO: `Merged=${merged.length}`,
+      },
+    });
+  };
+
+  pushIntervalStep(
+    0,
+    `Sort by Start Coordinate & Seed merged = [${fmtIv(sorted[0])}]`,
+    3,
+    6,
+    'ALLOCATE_HEAP',
+    `Sorting guarantees any interval overlapping ${fmtIv(sorted[0])} appears immediately next. Push the earliest interval onto the merged output buffer.`,
+    `merged = [${fmtIv(sorted[0])}]`,
+    false,
+    `Merged: ${fmtList(merged)}`
+  );
+
+  for (let i = 1; i < sorted.length; i++) {
+    comparisons++;
+    const [start, end] = sorted[i];
+    const last = merged[merged.length - 1];
+    if (start <= last[1]) {
+      const prevEnd = last[1];
+      const nextEnd = Math.max(last[1], end);
+      last[1] = nextEnd;
+      mergesCount++;
+      pushIntervalStep(
+        i,
+        `Overlap (${start} <= ${prevEnd}): Extend Tail ${fmtIv([last[0], prevEnd])} → ${fmtIv(last)}`,
+        7,
+        10,
+        'MUTATE_MEMORY',
+        `Incoming interval ${fmtIv([start, end])} starts at ${start} <= current tail end ${prevEnd}. Coalesce in-place by updating merged[-1][1] = max(${prevEnd}, ${end}) = ${nextEnd}.`,
+        `merged[${merged.length - 1}][1] = ${nextEnd}`,
+        true,
+        `Merged: ${fmtList(merged)}`
+      );
+    } else {
+      merged.push([start, end]);
+      pushIntervalStep(
+        i,
+        `Disjoint (${start} > ${last[1]}): Append New Span ${fmtIv([start, end])}`,
+        9,
+        12,
+        'ALLOCATE_HEAP',
+        `Incoming interval ${fmtIv([start, end])} begins strictly after tail end ${last[1]}. Append it as a new disjoint span in merged.`,
+        `merged.append(${fmtIv([start, end])})`,
+        false,
+        `Merged: ${fmtList(merged)}`
+      );
+    }
+  }
+
+  pushIntervalStep(
+    sorted.length - 1,
+    `Sweep Complete → ${merged.length} Disjoint Intervals`,
+    10,
+    15,
+    'RETURN_RESULT',
+    `All ${sorted.length} sorted intervals processed with ${mergesCount} overlap merges. Final non-overlapping schedule: ${fmtList(merged)}.`,
+    `Return ${fmtList(merged)}`,
+    false,
+    `Result: ${fmtList(merged)}`
+  );
 
   return steps;
 }

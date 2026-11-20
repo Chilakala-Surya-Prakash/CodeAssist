@@ -6,7 +6,13 @@ import {
   LocalTestCaseResult,
   runLocalTestSuite,
 } from '../utils/zeroCostEngines';
-import { BookOpen, Bug, Check, ChevronLeft, ChevronRight, Play, RotateCcw, Sparkles, Terminal, X } from 'lucide-react';
+import { resolveActiveLine } from '../utils/traceLineMap';
+import {
+  buildAllLinesWalkthrough,
+  LINE_ROLE_META,
+  resolveLineExplanation,
+} from '../utils/lineExplainer';
+import { AlertTriangle, BookOpen, Bug, ChevronLeft, ChevronRight, List, RotateCcw, Sparkles, Terminal, X } from 'lucide-react';
 
 interface CodeEditorPanelProps {
   problem: AlgorithmProblem;
@@ -21,9 +27,14 @@ interface CodeEditorPanelProps {
   onRunGeminiCustomTrace: () => void;
   isTracingGemini: boolean;
   currentStep: ExecutionStep;
-  stepIndex?: number;
-  totalSteps?: number;
-  onStepCommand?: (action: 'next' | 'prev' | 'reset' | 'goto', stepIndex?: number) => void;
+  breakpoints: Set<number>;
+  onToggleBreakpoint: (lineNum: number) => void;
+  hasCustomCodeEdits: boolean;
+  isCustomTraceActive: boolean;
+  customTraceStepCount: number;
+  customTraceError: string | null;
+  onClearCustomTrace: () => void;
+  onDismissCustomTraceError: () => void;
 }
 
 type LineExplanations = Record<number, string>;
@@ -36,6 +47,27 @@ function hashCode(str: string): string {
 }
 
 const ALL_LANGUAGES: Language[] = ['python', 'java', 'cpp', 'go', 'typescript', 'rust'];
+
+/** Renders inline backtick tokens (`curr.next`) as crisp monospace spans. */
+function InlineCodeText({ text }: { text: string }) {
+  const parts = text.split(/(`[^`]+`)/g);
+  return (
+    <>
+      {parts.map((part, idx) =>
+        part.startsWith('`') && part.endsWith('`') && part.length > 2 ? (
+          <code
+            key={idx}
+            className="px-1 py-0.2 mx-0.5 rounded bg-neutral-200/70 dark:bg-neutral-800 text-neutral-900 dark:text-neutral-100 font-mono text-[0.92em]"
+          >
+            {part.slice(1, -1)}
+          </code>
+        ) : (
+          <React.Fragment key={idx}>{part}</React.Fragment>
+        )
+      )}
+    </>
+  );
+}
 
 export const CodeEditorPanel: React.FC<CodeEditorPanelProps> = ({
   problem,
@@ -50,23 +82,44 @@ export const CodeEditorPanel: React.FC<CodeEditorPanelProps> = ({
   onRunGeminiCustomTrace,
   isTracingGemini,
   currentStep,
-  stepIndex,
-  totalSteps,
-  onStepCommand,
+  breakpoints,
+  onToggleBreakpoint,
+  hasCustomCodeEdits,
+  isCustomTraceActive,
+  customTraceStepCount,
+  customTraceError,
+  onClearCustomTrace,
+  onDismissCustomTraceError,
 }) => {
   const [isEditingCode, setIsEditingCode] = useState(false);
-  const [breakpoints, setBreakpoints] = useState<Set<number>>(new Set());
   const [bugHunterActive, setBugHunterActive] = useState(false);
   const [testSuiteResults, setTestSuiteResults] = useState<LocalTestCaseResult[] | null>(null);
   const [autoLoadedFailLabel, setAutoLoadedFailLabel] = useState<string | null>(null);
 
   const [pinnedLine, setPinnedLine] = useState<number | null>(null);
+  const [showAllLines, setShowAllLines] = useState(false);
   const [explanations, setExplanations] = useState<LineExplanations | null>(null);
   const [isExplaining, setIsExplaining] = useState(false);
   const [explainError, setExplainError] = useState<string | null>(null);
 
   const lines = code.split('\n');
   const explainKey = `tracecraft-explain-${language}-${hashCode(code)}`;
+
+  // Reset transient editor/challenge state when switching problems
+  useEffect(() => {
+    setBugHunterActive(false);
+    setTestSuiteResults(null);
+    setAutoLoadedFailLabel(null);
+    setIsEditingCode(false);
+    setShowAllLines(false);
+  }, [problem.id]);
+
+  // Auto-switch back to Step Trace View once a custom AI trace succeeds
+  useEffect(() => {
+    if (isCustomTraceActive) {
+      setIsEditingCode(false);
+    }
+  }, [isCustomTraceActive]);
 
   // Load cached explanations for this exact code; reset when code, language or problem changes
   useEffect(() => {
@@ -105,10 +158,10 @@ export const CodeEditorPanel: React.FC<CodeEditorPanelProps> = ({
       setIsExplaining(false);
     }
   };
-  const activeLine =
-    language === 'python'
-      ? currentStep.pythonLine
-      : Math.min(lines.length, Math.max(1, currentStep.javaLine));
+  const activeLine = useMemo(
+    () => resolveActiveLine(currentStep, language, problem.python.code, code),
+    [currentStep, language, problem.python.code, code]
+  );
 
   const solutionMeta = language === 'python' ? problem.python : problem.java;
   const bugChallenge = useMemo(() => getBugChallenge(problem), [problem]);
@@ -127,12 +180,7 @@ export const CodeEditorPanel: React.FC<CodeEditorPanelProps> = ({
   }, [currentStep]);
 
   const toggleBreakpoint = (lineNum: number) => {
-    setBreakpoints((prev) => {
-      const next = new Set(prev);
-      if (next.has(lineNum)) next.delete(lineNum);
-      else next.add(lineNum);
-      return next;
-    });
+    onToggleBreakpoint(lineNum);
   };
 
   const executeSuiteAndAutoOpenFailure = (targetCode: string, targetLang: Language) => {
@@ -169,58 +217,20 @@ export const CodeEditorPanel: React.FC<CodeEditorPanelProps> = ({
 
   return (
     <div className="flex flex-col rounded-xl border border-neutral-200/80 dark:border-neutral-800/80 bg-white dark:bg-[#111111] shadow-[0_1px_3px_rgba(0,0,0,0.04)] overflow-hidden">
-      {/* Unified VS Code Floating Debugger Bar docked directly atop code */}
-      {onStepCommand && typeof stepIndex === 'number' && typeof totalSteps === 'number' && (
-        <div className="flex flex-wrap items-center justify-between px-3.5 py-2 bg-neutral-900 text-white dark:bg-[#161B22] border-b border-neutral-800 text-xs font-mono select-none">
-          <div className="flex items-center gap-1.5">
-            <button
-              type="button"
-              onClick={() => onStepCommand('reset')}
-              disabled={stepIndex === 0}
-              title="Reset execution to Line 1 (|<)"
-              className="p-1.5 rounded hover:bg-neutral-800 disabled:opacity-30 transition-colors flex items-center justify-center"
-            >
-              <RotateCcw className="w-3.5 h-3.5 text-neutral-300" />
-            </button>
-            <button
-              type="button"
-              onClick={() => onStepCommand('prev')}
-              disabled={stepIndex === 0}
-              title="Step Back (<)"
-              className="p-1.5 rounded hover:bg-neutral-800 disabled:opacity-30 transition-colors flex items-center justify-center"
-            >
-              <ChevronLeft className="w-4 h-4 text-neutral-300" />
-            </button>
-            <button
-              type="button"
-              onClick={() => onStepCommand('next')}
-              disabled={stepIndex >= totalSteps - 1}
-              title="Step Over / Next Line Execution (▶)"
-              className="flex items-center gap-1.5 px-3 py-1 rounded bg-blue-600 hover:bg-blue-500 text-white font-semibold transition-colors disabled:opacity-30 shadow-xs"
-            >
-              <Play className="w-3.5 h-3.5 fill-current" />
-              <span>Step</span>
-            </button>
-          </div>
-
-          <div className="flex items-center gap-3">
-            <span className="text-[11px] text-neutral-300 tabular-nums">
-              Step <strong className="text-white">{stepIndex + 1}</strong> of {totalSteps} · Line {activeLine}
-            </span>
-            <input
-              type="range"
-              min={0}
-              max={Math.max(0, totalSteps - 1)}
-              value={stepIndex}
-              onChange={(e) => onStepCommand('goto', Number(e.target.value))}
-              className="w-16 sm:w-28 accent-blue-500 cursor-pointer h-1.5"
-            />
-          </div>
-        </div>
-      )}
-
-      {/* Editor Sub-Header: Language Switcher & Modes */}
+      {/* Editor Header: Language Switcher, Active Line Status & Modes */}
       <div className="flex flex-col gap-2.5 px-4 py-2.5 border-b border-neutral-100 dark:border-neutral-800/80 bg-neutral-50/80 dark:bg-neutral-900/60">
+        <div className="flex flex-wrap items-center justify-between gap-2 text-xs font-mono text-neutral-500 dark:text-neutral-400">
+          <span className="tabular-nums">
+            Executing <strong className="text-neutral-900 dark:text-neutral-100">Line {activeLine}</strong>
+            <span aria-hidden="true"> · </span>
+            <span>{LANGUAGE_LABELS[language]}</span>
+          </span>
+          <span className="text-[11px] tabular-nums">
+            {breakpoints.size > 0
+              ? `${breakpoints.size} breakpoint${breakpoints.size > 1 ? 's' : ''} active`
+              : 'Click line number to set breakpoint'}
+          </span>
+        </div>
         {/* 6-Language Switcher */}
         <div className="flex flex-wrap items-center gap-1 p-0.5 bg-neutral-200/60 dark:bg-neutral-800 rounded-md">
           {ALL_LANGUAGES.map((langKey) => (
@@ -262,11 +272,17 @@ export const CodeEditorPanel: React.FC<CodeEditorPanelProps> = ({
               type="button"
               onClick={handleExplainLines}
               disabled={isExplaining}
-              title="Ask the AI mentor to explain every line"
+              title="Optional: ask AI mentor for custom line explanations (prewritten guide is already active)"
               className="px-2.5 py-1 text-xs font-medium rounded-md border border-neutral-300 dark:border-neutral-700 text-neutral-700 dark:text-neutral-300 hover:bg-neutral-100 dark:hover:bg-neutral-800 transition-colors flex items-center gap-1 whitespace-nowrap shrink-0 disabled:opacity-60"
             >
               <BookOpen className="w-3.5 h-3.5" />
-              {isExplaining ? 'Explaining...' : explanations ? 'Re-explain lines' : 'Explain lines'}
+              {isExplaining
+                ? 'Explaining...'
+                : explanations
+                ? 'AI Re-explain'
+                : hasCustomCodeEdits
+                ? 'AI Explain Custom'
+                : 'AI Deep Explain'}
             </button>
             <button
               type="button"
@@ -292,6 +308,77 @@ export const CodeEditorPanel: React.FC<CodeEditorPanelProps> = ({
           </button>
         </div>
       </div>
+
+      {/* Custom AI Trace Active Banner */}
+      {isCustomTraceActive && (
+        <div
+          data-testid="custom-trace-active-banner"
+          className="px-4 py-2.5 border-b border-blue-200 dark:border-blue-800/80 bg-blue-50/80 dark:bg-blue-950/40 text-xs flex flex-wrap items-center justify-between gap-2"
+        >
+          <span className="font-mono font-semibold text-blue-900 dark:text-blue-200">
+            Custom AI Execution Trace Active · {customTraceStepCount} steps
+          </span>
+          <button
+            type="button"
+            onClick={onClearCustomTrace}
+            className="px-2.5 py-1 text-[11px] font-mono font-medium rounded border border-blue-300 dark:border-blue-700 bg-white dark:bg-neutral-900 text-blue-900 dark:text-blue-200 hover:bg-blue-100 dark:hover:bg-blue-900/50 transition-colors"
+          >
+            Return to Canonical Trace
+          </button>
+        </div>
+      )}
+
+      {/* Untraced Local Edits Notice */}
+      {hasCustomCodeEdits && !isCustomTraceActive && !isEditingCode && !bugHunterActive && (
+        <div
+          data-testid="untraced-edits-notice"
+          className="px-4 py-2.5 border-b border-amber-200 dark:border-amber-800/70 bg-amber-50/75 dark:bg-amber-950/30 text-xs flex flex-wrap items-center justify-between gap-2"
+        >
+          <span className="text-amber-900 dark:text-amber-200">
+            Modified source — memory canvas is still showing the canonical trace until you run{' '}
+            <strong>Trace Custom Code</strong>.
+          </span>
+          <div className="flex items-center gap-1.5 shrink-0">
+            <button
+              type="button"
+              onClick={onRunGeminiCustomTrace}
+              disabled={isTracingGemini}
+              className="px-2.5 py-1 text-[11px] font-mono font-semibold rounded bg-neutral-900 text-white dark:bg-neutral-100 dark:text-neutral-950 disabled:opacity-50"
+            >
+              {isTracingGemini ? 'Tracing...' : 'Trace Custom Code'}
+            </button>
+            <button
+              type="button"
+              onClick={onResetCode}
+              className="px-2 py-1 text-[11px] font-mono rounded border border-amber-300 dark:border-amber-700 text-amber-900 dark:text-amber-200 hover:bg-amber-100 dark:hover:bg-amber-900/50"
+            >
+              Reset
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Honest Custom Trace Error Alert */}
+      {customTraceError && (
+        <div
+          role="alert"
+          data-testid="custom-trace-error"
+          className="px-4 py-2.5 border-b border-red-200 dark:border-red-800 bg-red-50/90 dark:bg-red-950/40 text-xs flex items-start justify-between gap-2 text-red-800 dark:text-red-200"
+        >
+          <div className="space-y-0.5">
+            <div className="font-mono font-semibold">Custom trace unavailable</div>
+            <p className="leading-relaxed">{customTraceError}</p>
+          </div>
+          <button
+            type="button"
+            onClick={onDismissCustomTraceError}
+            aria-label="Dismiss custom trace error"
+            className="p-1 text-red-600 dark:text-red-300 hover:opacity-75 shrink-0"
+          >
+            <X className="w-3.5 h-3.5" />
+          </button>
+        </div>
+      )}
 
       {/* Bug Hunter Active Callout */}
       {bugHunterActive && (
@@ -323,7 +410,7 @@ export const CodeEditorPanel: React.FC<CodeEditorPanelProps> = ({
           />
           <div className="mt-2 flex flex-wrap items-center justify-between gap-2">
             <span className="text-[11px] font-mono text-neutral-500 dark:text-neutral-400">
-              Edit {LANGUAGE_LABELS[language]} code, run the 16-case verification suite, or trace custom execution.
+              Edit {LANGUAGE_LABELS[language]} code, run structural invariant verification, or trace custom execution.
             </span>
             <div className="flex items-center gap-2">
               <button
@@ -331,7 +418,7 @@ export const CodeEditorPanel: React.FC<CodeEditorPanelProps> = ({
                 onClick={handleRunTestSuite}
                 className="px-3 py-1.5 text-xs font-medium border border-neutral-300 dark:border-neutral-700 bg-white dark:bg-neutral-900 text-neutral-900 dark:text-neutral-100 rounded-md hover:bg-neutral-100 dark:hover:bg-neutral-800 transition-colors whitespace-nowrap shrink-0"
               >
-                Verify 16-Case Suite
+                Verify Invariants &amp; Cases
               </button>
               <button
                 type="button"
@@ -369,18 +456,30 @@ export const CodeEditorPanel: React.FC<CodeEditorPanelProps> = ({
                       : 'hover:bg-neutral-100 dark:hover:bg-neutral-900 text-neutral-700 dark:text-neutral-300'
                   }`}
                 >
-                  <div
+                  <button
+                    type="button"
                     onClick={(e) => {
                       e.stopPropagation();
                       toggleBreakpoint(lineNumber);
                     }}
-                    title="Click to toggle breakpoint"
-                    className="w-12 shrink-0 flex items-center justify-between pr-3 text-neutral-400 dark:text-neutral-500 tabular-nums">
-                    <span className="w-3 text-[11px] text-blue-600 dark:text-blue-400 font-bold">
-                      {isCurrent ? '▶' : hasBp ? '●' : ''}
+                    aria-label={`${hasBp ? 'Remove' : 'Set'} breakpoint on line ${lineNumber}`}
+                    aria-pressed={hasBp}
+                    title={hasBp ? `Remove breakpoint on Line ${lineNumber}` : `Set breakpoint on Line ${lineNumber}`}
+                    className="w-12 shrink-0 flex items-center justify-between pr-3 text-neutral-400 dark:text-neutral-500 hover:text-red-500 tabular-nums"
+                  >
+                    <span
+                      className={`w-3 text-[11px] font-bold ${
+                        hasBp
+                          ? 'text-red-500'
+                          : isCurrent
+                          ? 'text-blue-600 dark:text-blue-400'
+                          : ''
+                      }`}
+                    >
+                      {hasBp ? '●' : isCurrent ? '▶' : ''}
                     </span>
                     <span>{lineNumber}</span>
-                  </div>
+                  </button>
                   <pre className="whitespace-pre font-mono">{lineText || ' '}</pre>
                   {explanations?.[lineNumber] && !isCurrent && (
                     <span aria-hidden="true" className="ml-2 text-[11px] text-amber-500/80 select-none">•</span>
@@ -399,73 +498,186 @@ export const CodeEditorPanel: React.FC<CodeEditorPanelProps> = ({
         </div>
       )}
 
-      {/* Line Explainer: follows the running line, or the line the learner pinned */}
+      {/* Prewritten + Live Line-by-Line Explainer: instant plain-English guide for every line */}
       {!isEditingCode && (() => {
         const shown = pinnedLine ?? activeLine;
         const text = lines[shown - 1] ?? '';
-        const aiText = explanations?.[shown];
+        const aiText = explanations?.[shown] ?? null;
+        const resolved = resolveLineExplanation(problem, language, code, shown, aiText);
+        const roleMeta = LINE_ROLE_META[resolved.role];
+        const allWalkthrough = showAllLines
+          ? buildAllLinesWalkthrough(problem, language, code, explanations)
+          : [];
+
         return (
           <div
-            className="px-4 py-3 border-t border-neutral-100 dark:border-neutral-800/80 bg-neutral-50/80 dark:bg-neutral-900/40 space-y-1.5"
+            data-testid="line-explanation-panel"
+            className="px-4 py-3 border-t border-neutral-100 dark:border-neutral-800/80 bg-neutral-50/80 dark:bg-neutral-900/40 space-y-2"
             role="region"
             aria-label="Line explanation"
           >
-            <div className="flex flex-wrap items-center justify-between gap-2 text-xs font-mono">
-              <span className="font-bold text-neutral-950 dark:text-neutral-100">
-                Line {shown}
-                <span className="ml-2 font-normal text-neutral-500">
+            <div className="flex flex-wrap items-center justify-between gap-2 text-xs">
+              <div className="flex flex-wrap items-center gap-2 font-mono">
+                <span className="font-bold text-neutral-950 dark:text-neutral-100">
+                  Line {shown}
+                </span>
+                <span className="text-neutral-400 dark:text-neutral-600" aria-hidden="true">·</span>
+                <span className="text-neutral-500 dark:text-neutral-400">
                   {pinnedLine ? 'pinned' : 'following execution'}
                 </span>
-              </span>
-              <span className="flex items-center gap-1">
-                <button
-                  type="button"
-                  aria-label="Previous line"
-                  onClick={() => setPinnedLine(Math.max(1, shown - 1))}
-                  disabled={shown <= 1}
-                  className="p-1 rounded border border-neutral-300 dark:border-neutral-700 disabled:opacity-40"
+                <span
+                  className={`px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide rounded border ${roleMeta.toneClass}`}
                 >
-                  <ChevronLeft className="w-3.5 h-3.5" />
-                </button>
-                <button
-                  type="button"
-                  aria-label="Next line"
-                  onClick={() => setPinnedLine(Math.min(lines.length, shown + 1))}
-                  disabled={shown >= lines.length}
-                  className="p-1 rounded border border-neutral-300 dark:border-neutral-700 disabled:opacity-40"
-                >
-                  <ChevronRight className="w-3.5 h-3.5" />
-                </button>
-                {pinnedLine && (
-                  <button
-                    type="button"
-                    onClick={() => setPinnedLine(null)}
-                    className="px-2 py-1 rounded border border-neutral-300 dark:border-neutral-700 text-xs"
-                  >
-                    Follow
-                  </button>
+                  {roleMeta.label}
+                </span>
+                {resolved.source === 'ai' && (
+                  <span className="text-[10px] text-blue-600 dark:text-blue-400 font-semibold">
+                    AI Custom
+                  </span>
                 )}
-              </span>
+              </div>
+
+              <div className="flex items-center gap-1 font-mono">
+                <button
+                  type="button"
+                  onClick={() => setShowAllLines((v) => !v)}
+                  aria-pressed={showAllLines}
+                  className={`px-2 py-1 rounded border text-[11px] font-medium flex items-center gap-1 transition-colors ${
+                    showAllLines
+                      ? 'border-neutral-900 bg-neutral-900 text-white dark:border-neutral-100 dark:bg-neutral-100 dark:text-neutral-950'
+                      : 'border-neutral-300 dark:border-neutral-700 text-neutral-700 dark:text-neutral-300 hover:bg-neutral-100 dark:hover:bg-neutral-800'
+                  }`}
+                >
+                  <List className="w-3 h-3" />
+                  {showAllLines ? 'Single Line' : 'All Lines'}
+                </button>
+                {!showAllLines && (
+                  <>
+                    <button
+                      type="button"
+                      aria-label="Previous line"
+                      onClick={() => setPinnedLine(Math.max(1, shown - 1))}
+                      disabled={shown <= 1}
+                      className="p-1 rounded border border-neutral-300 dark:border-neutral-700 disabled:opacity-40 hover:bg-neutral-100 dark:hover:bg-neutral-800"
+                    >
+                      <ChevronLeft className="w-3.5 h-3.5" />
+                    </button>
+                    <button
+                      type="button"
+                      aria-label="Next line"
+                      onClick={() => setPinnedLine(Math.min(lines.length, shown + 1))}
+                      disabled={shown >= lines.length}
+                      className="p-1 rounded border border-neutral-300 dark:border-neutral-700 disabled:opacity-40 hover:bg-neutral-100 dark:hover:bg-neutral-800"
+                    >
+                      <ChevronRight className="w-3.5 h-3.5" />
+                    </button>
+                    {pinnedLine && (
+                      <button
+                        type="button"
+                        onClick={() => setPinnedLine(null)}
+                        className="px-2 py-1 rounded border border-neutral-300 dark:border-neutral-700 text-[11px] hover:bg-neutral-100 dark:hover:bg-neutral-800"
+                      >
+                        Follow
+                      </button>
+                    )}
+                  </>
+                )}
+              </div>
             </div>
-            <code className="block text-xs font-mono text-neutral-700 dark:text-neutral-300 truncate">
-              {text.trim() || '(blank line)'}
-            </code>
-            {aiText ? (
-              <p className="text-xs sm:text-sm text-neutral-800 dark:text-neutral-200 leading-relaxed">{aiText}</p>
+
+            {showAllLines ? (
+              <div
+                data-testid="all-lines-walkthrough"
+                className="max-h-72 overflow-y-auto divide-y divide-neutral-200/70 dark:divide-neutral-800/80 rounded-lg border border-neutral-200/80 dark:border-neutral-800 bg-white dark:bg-neutral-950/70"
+              >
+                {allWalkthrough.map((item) => {
+                  const isItemActive = item.lineNumber === activeLine;
+                  const isItemPinned = item.lineNumber === pinnedLine;
+                  const itemRole = LINE_ROLE_META[item.explanation.role];
+                  return (
+                    <button
+                      key={item.lineNumber}
+                      type="button"
+                      onClick={() => {
+                        setPinnedLine(item.lineNumber);
+                        setShowAllLines(false);
+                      }}
+                      className={`w-full text-left px-3 py-2.5 transition-colors space-y-1 ${
+                        isItemActive
+                          ? 'bg-blue-50/70 dark:bg-blue-950/30 border-l-2 border-l-blue-500'
+                          : isItemPinned
+                          ? 'bg-amber-50/60 dark:bg-amber-950/20 border-l-2 border-l-amber-500'
+                          : 'hover:bg-neutral-50 dark:hover:bg-neutral-900/70'
+                      }`}
+                    >
+                      <div className="flex items-center justify-between gap-2">
+                        <div className="flex items-center gap-2 min-w-0">
+                          <span className="font-mono text-[11px] font-bold text-neutral-500 dark:text-neutral-400 tabular-nums shrink-0">
+                            L{item.lineNumber}
+                          </span>
+                          <code className="text-[11px] font-mono text-neutral-800 dark:text-neutral-200 truncate">
+                            {item.codeText}
+                          </code>
+                        </div>
+                        <span
+                          className={`px-1.5 py-0.5 text-[9px] font-mono font-semibold uppercase rounded border shrink-0 ${itemRole.toneClass}`}
+                        >
+                          {itemRole.label}
+                        </span>
+                      </div>
+                      <p className="text-xs text-neutral-800 dark:text-neutral-200 leading-relaxed">
+                        <InlineCodeText text={item.explanation.summary} />
+                      </p>
+                      <p className="text-[11px] text-neutral-500 dark:text-neutral-400 leading-relaxed">
+                        <strong className="font-medium text-neutral-600 dark:text-neutral-300">Why:</strong>{' '}
+                        <InlineCodeText text={item.explanation.why} />
+                      </p>
+                      {item.explanation.watchOut && (
+                        <p className="text-[11px] text-amber-800 dark:text-amber-300 leading-relaxed flex items-start gap-1">
+                          <AlertTriangle className="w-3 h-3 shrink-0 mt-0.5" />
+                          <span>
+                            <strong>Watch out:</strong> <InlineCodeText text={item.explanation.watchOut} />
+                          </span>
+                        </p>
+                      )}
+                    </button>
+                  );
+                })}
+              </div>
             ) : (
-              <p className="text-xs sm:text-sm text-neutral-600 dark:text-neutral-400 leading-relaxed">
-                {shown === activeLine
-                  ? currentStep.intuition
-                  : explanations
-                  ? 'Nothing to explain on this line.'
-                  : 'Press "Explain lines" to get a plain-English explanation of every line.'}
-              </p>
+              <div className="space-y-1.5">
+                <code className="block px-2.5 py-1.5 rounded-md bg-white dark:bg-neutral-950 border border-neutral-200/80 dark:border-neutral-800 text-xs font-mono text-neutral-800 dark:text-neutral-200 truncate">
+                  {text.trim() || '(blank line)'}
+                </code>
+
+                <p className="text-xs sm:text-sm font-medium text-neutral-900 dark:text-neutral-100 leading-relaxed">
+                  <InlineCodeText text={resolved.summary} />
+                </p>
+
+                <p className="text-xs text-neutral-600 dark:text-neutral-400 leading-relaxed">
+                  <strong className="font-semibold text-neutral-700 dark:text-neutral-300">Why:</strong>{' '}
+                  <InlineCodeText text={resolved.why} />
+                </p>
+
+                {resolved.watchOut && (
+                  <div className="px-2.5 py-1.5 rounded-md border border-amber-200/90 dark:border-amber-800/70 bg-amber-50/75 dark:bg-amber-950/30 text-xs text-amber-900 dark:text-amber-200 leading-relaxed flex items-start gap-1.5">
+                    <AlertTriangle className="w-3.5 h-3.5 shrink-0 mt-0.5 text-amber-600 dark:text-amber-400" />
+                    <span>
+                      <strong className="font-semibold">Watch out:</strong>{' '}
+                      <InlineCodeText text={resolved.watchOut} />
+                    </span>
+                  </div>
+                )}
+
+                {shown === activeLine && (currentStep.memoryMutation || currentStep.intuition) && (
+                  <div className="pt-1 border-t border-neutral-200/70 dark:border-neutral-800/70 text-[11px] font-mono text-blue-700 dark:text-blue-300 leading-relaxed">
+                    <strong className="uppercase tracking-wide text-[10px] mr-1.5">This step:</strong>
+                    {currentStep.memoryMutation || currentStep.intuition}
+                  </div>
+                )}
+              </div>
             )}
-            {shown === activeLine && aiText && (
-              <p className="text-xs text-neutral-500 dark:text-neutral-400 leading-relaxed">
-                This step: {currentStep.memoryMutation}
-              </p>
-            )}
+
             {explainError && (
               <p role="alert" className="text-xs text-red-600 dark:text-red-400">
                 {explainError}
@@ -498,43 +710,72 @@ export const CodeEditorPanel: React.FC<CodeEditorPanelProps> = ({
 
       {/* Test Suite Results Drawer */}
       {testSuiteResults && (
-        <div className="px-4 py-3 border-t border-neutral-200 dark:border-neutral-800 bg-neutral-50 dark:bg-neutral-900/80 space-y-2 text-xs font-mono">
-          <div className="flex items-center justify-between">
-            <span className="font-semibold text-neutral-900 dark:text-neutral-100">
-              Test Suite Verification: {testSuiteResults.filter((r) => r.passed).length}/{testSuiteResults.length} Passed
-            </span>
+        <div
+          data-testid="verification-suite-drawer"
+          className="px-4 py-3 border-t border-neutral-200 dark:border-neutral-800 bg-neutral-50 dark:bg-neutral-900/80 space-y-2.5 text-xs font-mono"
+        >
+          <div className="flex items-center justify-between gap-2">
+            <div>
+              <span className="font-semibold text-neutral-900 dark:text-neutral-100">
+                Static Invariant &amp; Trace Suite: {testSuiteResults.filter((r) => r.passed).length}/
+                {testSuiteResults.length} Passed
+              </span>
+              {testSuiteResults[0]?.checkedInvariant && (
+                <div className="text-[11px] text-neutral-500 dark:text-neutral-400">
+                  Checked invariant: {testSuiteResults[0].checkedInvariant}
+                </div>
+              )}
+            </div>
             <button
               type="button"
               onClick={() => setTestSuiteResults(null)}
-              className="text-neutral-400 hover:text-neutral-900 dark:hover:text-white"
+              aria-label="Close verification suite results"
+              className="text-neutral-400 hover:text-neutral-900 dark:hover:text-white p-1"
             >
               <X className="w-3.5 h-3.5" />
             </button>
           </div>
-          {autoLoadedFailLabel && (
-            <div className="p-2 rounded bg-red-50 dark:bg-red-950/40 border border-red-200 dark:border-red-800 text-red-700 dark:text-red-300 text-[11px]">
-              Loaded failing test input into visualizer: {autoLoadedFailLabel}
+          {!testSuiteResults[0]?.passed && testSuiteResults[0]?.actualOutput && (
+            <div
+              role="alert"
+              className="p-2.5 rounded bg-red-50 dark:bg-red-950/40 border border-red-200 dark:border-red-800 text-red-800 dark:text-red-200 text-[11px] leading-relaxed"
+            >
+              <strong className="block mb-0.5">Structural Defect Detected:</strong>
+              {testSuiteResults[0].actualOutput}
+              {autoLoadedFailLabel && (
+                <div className="mt-1 opacity-80">
+                  Loaded failing case into visualizer: {autoLoadedFailLabel}
+                </div>
+              )}
             </div>
           )}
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5 max-h-48 overflow-y-auto">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5 max-h-56 overflow-y-auto">
             {testSuiteResults.map((tc) => (
-              <div
+              <button
                 key={tc.id}
+                type="button"
                 onClick={() => {
                   onCustomInputChange(tc.input);
                   onRunTrace();
                 }}
-                className={`p-2 rounded border cursor-pointer transition-colors flex items-center justify-between ${
+                title={`Click to trace input: ${tc.input}`}
+                className={`p-2 rounded border text-left transition-colors flex flex-col gap-0.5 ${
                   tc.passed
-                    ? 'border-emerald-200 dark:border-emerald-900 bg-emerald-50/50 dark:bg-emerald-950/20 text-emerald-800 dark:text-emerald-300'
-                    : 'border-red-200 dark:border-red-900 bg-red-50/50 dark:bg-red-950/20 text-red-800 dark:text-red-300'
+                    ? 'border-emerald-200 dark:border-emerald-900 bg-emerald-50/50 dark:bg-emerald-950/20 text-emerald-900 dark:text-emerald-200 hover:bg-emerald-100/60 dark:hover:bg-emerald-950/40'
+                    : 'border-red-200 dark:border-red-900 bg-red-50/50 dark:bg-red-950/20 text-red-900 dark:text-red-200 hover:bg-red-100/60 dark:hover:bg-red-950/40'
                 }`}
               >
-                <span className="truncate">{tc.label}</span>
-                <span className="tabular-nums font-semibold shrink-0 ml-1">
-                  {tc.passed ? 'PASS' : 'FAIL'}
-                </span>
-              </div>
+                <div className="flex items-center justify-between gap-1.5 w-full">
+                  <span className="truncate font-semibold">{tc.label}</span>
+                  <span className="tabular-nums font-bold shrink-0">
+                    {tc.passed ? 'PASS' : 'FAIL'}
+                  </span>
+                </div>
+                <div className="flex items-center justify-between gap-2 text-[10px] opacity-75 w-full">
+                  <span className="truncate">{tc.input}</span>
+                  <span className="shrink-0 tabular-nums">{tc.stepsCount} steps</span>
+                </div>
+              </button>
             ))}
           </div>
         </div>

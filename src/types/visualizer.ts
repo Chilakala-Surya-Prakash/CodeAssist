@@ -60,7 +60,7 @@ export interface HeapCell {
 export interface HeapObject {
   id: string;
   address: string; // e.g., 0x1040A0
-  type: 'Array' | 'LinkedList' | 'HashMap' | 'Stack' | 'BinaryTree' | 'DPTable' | 'GraphQueue';
+  type: 'Array' | 'LinkedList' | 'HashMap' | 'Stack' | 'BinaryTree' | 'DPTable' | 'GraphQueue' | 'Queue';
   label: string;
   byteSize: number;
   refCount: number;
@@ -117,11 +117,13 @@ export interface ProblemSolution {
 
 export interface AlgorithmProblem {
   id: string;
-  number: number; // Sequential 1..200
-  topicCode?: string; // Authentic topic code e.g. ARR-01 .. ARR-25
+  number: number; // Sequential 1..N
+  topicCode?: string; // Authentic topic code e.g. ARR-01 .. ARR-N
   topic?: CoreTopic;
-  topicIndex?: number; // 1..25 within topic
+  topicIndex?: number; // 1..N within topic
   traceFamilyId?: string; // Underlying trace archetype id
+  traceMode?: 'native' | 'pattern-template'; // Exact 1:1 tracer vs shared pattern template
+  traceTemplateTitle?: string; // Canonical algorithm name when using a shared pattern template
   title: string;
   slug: string;
   difficulty: Difficulty;

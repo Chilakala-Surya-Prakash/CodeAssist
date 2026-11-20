@@ -44,7 +44,8 @@ export const CompanyDirectory: React.FC<CompanyDirectoryProps> = ({
   const [selectedTier, setSelectedTier] = useState<'All' | CompanyProfile['tier']>('All');
   const [selectedCompanyId, setSelectedCompanyId] = useState<string>('all');
   const [selectedDifficulty, setSelectedDifficulty] = useState<'All' | Difficulty>('All');
-  const [selectedTopic, setSelectedTopic] = useState<'All' | CoreTopic>('Arrays');
+  const [selectedTopic, setSelectedTopic] = useState<'All' | CoreTopic>('All');
+  const [traceModeFilter, setTraceModeFilter] = useState<'all' | 'native' | 'pattern-template'>('all');
   const [expandedCompanyId, setExpandedCompanyId] = useState<string>(companies[0]?.id || 'google');
 
   // Active company question sub-filters
@@ -104,11 +105,20 @@ export const CompanyDirectory: React.FC<CompanyDirectoryProps> = ({
     });
   }, [companies, selectedTier, searchQuery]);
 
+  const nativeCount = useMemo(
+    () => problems.filter((p) => p.traceMode === 'native').length,
+    [problems]
+  );
+
   const filteredProblems = useMemo(() => {
     return problems.filter((p) => {
       const matchesCompany = selectedCompanyId === 'all' || p.companies.includes(selectedCompanyId);
       const matchesDiff = selectedDifficulty === 'All' || p.difficulty === selectedDifficulty;
       const matchesTopic = selectedTopic === 'All' || p.topic === selectedTopic;
+      const matchesTraceMode =
+        traceModeFilter === 'all' ||
+        (traceModeFilter === 'native' && p.traceMode === 'native') ||
+        (traceModeFilter === 'pattern-template' && p.traceMode !== 'native');
       const q = searchQuery.trim().toLowerCase();
       const matchesQuery =
         !q ||
@@ -117,9 +127,9 @@ export const CompanyDirectory: React.FC<CompanyDirectoryProps> = ({
         String(p.number).includes(q) ||
         p.pattern.toLowerCase().includes(q) ||
         p.summary.toLowerCase().includes(q);
-      return matchesCompany && matchesDiff && matchesTopic && matchesQuery;
+      return matchesCompany && matchesDiff && matchesTopic && matchesTraceMode && matchesQuery;
     });
-  }, [problems, selectedCompanyId, selectedDifficulty, selectedTopic, searchQuery]);
+  }, [problems, selectedCompanyId, selectedDifficulty, selectedTopic, traceModeFilter, searchQuery]);
 
   const activeCompany = useMemo(
     () => companies.find((c) => c.id === expandedCompanyId) || filteredCompanies[0] || companies[0],
@@ -547,13 +557,13 @@ export const CompanyDirectory: React.FC<CompanyDirectoryProps> = ({
       <div className="flex flex-col md:flex-row md:items-end justify-between gap-4 pb-5 border-b border-neutral-200 dark:border-neutral-800">
         <div>
           <div className="text-xs font-mono text-neutral-500 dark:text-neutral-400">
-            8 Core Programming Topics · 25 Curated Problems Per Topic ({problems.length} Total) · {solvedProblemIds.size} Completed
+            {CORE_TOPICS.length} Core Topics · {nativeCount} Native Memory Traces · {problems.length} Deduplicated Problems · {solvedProblemIds.size} Completed
           </div>
           <h1 className="text-2xl font-bold tracking-tight text-neutral-950 dark:text-neutral-100 mt-1">
-            Topic-by-Topic Engineering Curriculum (25 Questions Each)
+            Topic-by-Topic Engineering Curriculum
           </h1>
           <p className="text-sm text-neutral-600 dark:text-neutral-400 mt-1 max-w-2xl">
-            Select a topic below—Arrays, Linked Lists, Dynamic Programming, Greedy, Sliding Window, Stacks & Queues, Trees & Heaps, or Graphs & Search—to practice its 25 sequential problems step by step.
+            Start with the <strong>{nativeCount} Native Memory Traces</strong> for exact 1:1 line-by-line pointer execution, or explore all {problems.length} unique problems across 8 core topics using shared pattern templates and custom AI tracing.
           </p>
         </div>
 
@@ -570,16 +580,16 @@ export const CompanyDirectory: React.FC<CompanyDirectoryProps> = ({
         </div>
       </div>
 
-      {/* 8 Topic Cards Grid (25 Questions Per Topic) */}
+      {/* 8 Topic Cards Grid */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5">
         {CORE_TOPICS.map((topicMeta) => {
           const isSelected = selectedTopic === topicMeta.id;
-          const stats = topicCounts[topicMeta.id] || { total: 25, solved: 0 };
+          const stats = topicCounts[topicMeta.id] || { total: 0, solved: 0 };
           return (
             <button
               key={topicMeta.id}
               type="button"
-              onClick={() => setSelectedTopic(topicMeta.id)}
+              onClick={() => setSelectedTopic(isSelected ? 'All' : topicMeta.id)}
               className={`text-left p-4 rounded-lg border transition-all flex flex-col justify-between space-y-2.5 ${
                 isSelected
                   ? 'border-neutral-900 bg-neutral-900 text-white dark:border-neutral-100 dark:bg-neutral-100 dark:text-neutral-950'
@@ -588,11 +598,11 @@ export const CompanyDirectory: React.FC<CompanyDirectoryProps> = ({
             >
               <div>
                 <div
-                  className={`flex items-center justify-between text-xs font-mono ${
+                  className={`flex items-center justify-between text-xs font-mono tabular-nums ${
                     isSelected ? 'text-neutral-300 dark:text-neutral-600' : 'text-neutral-500'
                   }`}
                 >
-                  <span>{topicMeta.codePrefix}-01..25</span>
+                  <span>{topicMeta.codePrefix}-01..{String(stats.total).padStart(2, '0')}</span>
                   <span>
                     {stats.solved}/{stats.total} Solved
                   </span>
@@ -613,19 +623,61 @@ export const CompanyDirectory: React.FC<CompanyDirectoryProps> = ({
         })}
       </div>
 
-      {/* Secondary Filter Bar: Topic All Toggle, Difficulty & Company */}
+      {/* Secondary Filter Bar: Trace Fidelity Toggle, Topic All Toggle, Difficulty & Company */}
       <div className="flex flex-wrap items-center justify-between gap-4 pt-1">
-        <div className="flex flex-wrap items-center gap-2">
-          <span className="text-xs font-mono font-semibold text-neutral-900 dark:text-neutral-100">
-            Active Topic: {selectedTopic === 'All' ? `All Topics (${problems.length} Questions)` : `${selectedTopic} (25 Questions)`}
+        <div className="flex flex-wrap items-center gap-2.5">
+          {/* Trace Fidelity Segmented Filter */}
+          <div
+            role="group"
+            aria-label="Filter by trace fidelity"
+            className="flex items-center gap-1 p-1 bg-neutral-100 dark:bg-neutral-900 rounded-md border border-neutral-200 dark:border-neutral-800"
+          >
+            <button
+              type="button"
+              onClick={() => setTraceModeFilter('all')}
+              className={`px-2.5 py-1 text-xs font-medium rounded transition-colors whitespace-nowrap shrink-0 ${
+                traceModeFilter === 'all'
+                  ? 'bg-white dark:bg-neutral-800 text-neutral-950 dark:text-white shadow-2xs'
+                  : 'text-neutral-600 dark:text-neutral-400 hover:text-neutral-950 dark:hover:text-white'
+              }`}
+            >
+              All ({problems.length})
+            </button>
+            <button
+              type="button"
+              onClick={() => setTraceModeFilter('native')}
+              className={`px-2.5 py-1 text-xs font-medium rounded transition-colors whitespace-nowrap shrink-0 ${
+                traceModeFilter === 'native'
+                  ? 'bg-white dark:bg-neutral-800 text-neutral-950 dark:text-white shadow-2xs'
+                  : 'text-neutral-600 dark:text-neutral-400 hover:text-neutral-950 dark:hover:text-white'
+              }`}
+            >
+              Native Memory Traces ({nativeCount})
+            </button>
+            <button
+              type="button"
+              onClick={() => setTraceModeFilter('pattern-template')}
+              className={`px-2.5 py-1 text-xs font-medium rounded transition-colors whitespace-nowrap shrink-0 ${
+                traceModeFilter === 'pattern-template'
+                  ? 'bg-white dark:bg-neutral-800 text-neutral-950 dark:text-white shadow-2xs'
+                  : 'text-neutral-600 dark:text-neutral-400 hover:text-neutral-950 dark:hover:text-white'
+              }`}
+            >
+              Pattern Templates ({problems.length - nativeCount})
+            </button>
+          </div>
+
+          <span className="text-xs font-mono text-neutral-500 dark:text-neutral-400 tabular-nums">
+            Showing {filteredProblems.length} {filteredProblems.length === 1 ? 'problem' : 'problems'}
+            {selectedTopic !== 'All' ? ` in ${selectedTopic}` : ''}
           </span>
           {selectedTopic !== 'All' && (
             <button
               type="button"
               onClick={() => setSelectedTopic('All')}
-              className="px-2.5 py-1 text-xs font-mono rounded border border-neutral-300 dark:border-neutral-700 text-neutral-600 dark:text-neutral-300 hover:bg-neutral-100 dark:hover:bg-neutral-800"
+              className="px-2 py-1 text-xs font-mono rounded border border-neutral-300 dark:border-neutral-700 text-neutral-600 dark:text-neutral-300 hover:bg-neutral-100 dark:hover:bg-neutral-800"
             >
-              Show All {problems.length} Questions
+              Clear Topic
             </button>
           )}
         </div>
@@ -720,6 +772,17 @@ export const CompanyDirectory: React.FC<CompanyDirectoryProps> = ({
                       </div>
                       <div className="text-xs text-neutral-500 dark:text-neutral-400 mt-0.5 line-clamp-1">
                         {prob.summary}
+                      </div>
+                      <div className="text-[11px] font-mono text-neutral-500 dark:text-neutral-400 mt-1">
+                        {prob.traceMode === 'native' ? (
+                          <span className="font-semibold text-emerald-700 dark:text-emerald-400">
+                            Native 1:1 Memory Trace
+                          </span>
+                        ) : (
+                          <span>
+                            Pattern Template · uses {prob.traceTemplateTitle || prob.traceFamilyId}
+                          </span>
+                        )}
                       </div>
                     </td>
                     <td className="py-3.5 px-4 text-xs font-mono text-neutral-600 dark:text-neutral-300 whitespace-nowrap">

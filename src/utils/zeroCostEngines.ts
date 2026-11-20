@@ -1,5 +1,7 @@
 import { AlgorithmProblem, ExecutionStep, Language } from '../types/visualizer';
 import { generateExecutionTrace } from './traceEngine';
+import { NATIVE_MULTI_LANG_CODE } from '../data/nativeMultiLang';
+import { getFamilyTestInputs, injectGenuineBug, verifyCodeStructure } from './codeVerifier';
 
 export interface ComplexityDiffReport {
   inputSizeN: number;
@@ -53,6 +55,7 @@ export interface LocalTestCaseResult {
   passed: boolean;
   stepsCount: number;
   peakHeapBytes: number;
+  checkedInvariant?: string;
 }
 
 export interface SpacedRepetitionItem {
@@ -86,12 +89,16 @@ export interface RecursionTreeNode {
 }
 
 export interface MockRubricScorecard {
+  id: string;
+  createdAt: string;
   companyName: string;
+  problemId: string;
   problemTitle: string;
   language: Language;
   elapsedMinutes: number;
   verdict: 'Strong Hire' | 'Hire' | 'Lean Hire' | 'No Hire';
   overallScore: number; // out of 100
+  isStubSubmission?: boolean;
   dimensions: {
     label: string;
     score: number; // out of 20
@@ -109,393 +116,20 @@ export const LANGUAGE_LABELS: Record<Language, string> = {
 };
 
 /**
- * Generates idiomatic canonical code in all 6 languages (Python, Java, C++20, Go, TypeScript, Rust).
+ * Generates idiomatic canonical code in all 6 languages (Python, Java, C++20, Go, TypeScript, Rust)
+ * backed by real implementations for all 15 native trace families.
  */
 export function getMultiLanguageCode(problem: AlgorithmProblem, language: Language): string {
   if (language === 'python') return problem.python.code;
   if (language === 'java') return problem.java.code;
 
   const familyId = problem.traceFamilyId || problem.id;
-
-  if (familyId === 'reverse-linked-list') {
-    if (language === 'cpp') {
-      return `struct ListNode {
-    int val;
-    ListNode *next;
-    ListNode(int x) : val(x), next(nullptr) {}
-};
-
-class Solution {
-public:
-    ListNode* reverseList(ListNode* head) {
-        ListNode* prev = nullptr;
-        ListNode* curr = head;
-        while (curr != nullptr) {
-            ListNode* nxt = curr->next; // Cache forward heap address
-            curr->next = prev;          // Flip pointer 180 degrees
-            prev = curr;                // Advance prev register
-            curr = nxt;                 // Advance curr register
-        }
-        return prev;
-    }
-};`;
-    }
-    if (language === 'go') {
-      return `type ListNode struct {
-    Val  int
-    Next *ListNode
-}
-
-func reverseList(head *ListNode) *ListNode {
-    var prev *ListNode = nil
-    curr := head
-    for curr != nil {
-        nxt := curr.Next // Save forward reference
-        curr.Next = prev // Mutate .Next backward in-place
-        prev = curr      // Step prev forward
-        curr = nxt       // Step curr forward
-    }
-    return prev
-}`;
-    }
-    if (language === 'typescript') {
-      return `class ListNode {
-  val: number;
-  next: ListNode | null;
-  constructor(val = 0, next: ListNode | null = null) {
-    this.val = val;
-    this.next = next;
-  }
-}
-
-export function reverseList(head: ListNode | null): ListNode | null {
-  let prev: ListNode | null = null;
-  let curr: ListNode | null = head;
-  while (curr !== null) {
-    const nxt: ListNode | null = curr.next;
-    curr.next = prev;
-    prev = curr;
-    curr = nxt;
-  }
-  return prev;
-}`;
-    }
-    if (language === 'rust') {
-      return `#[derive(PartialEq, Eq, Clone, Debug)]
-pub struct ListNode {
-    pub val: i32,
-    pub next: Option<Box<ListNode>>,
-}
-
-pub fn reverse_list(head: Option<Box<ListNode>>) -> Option<Box<ListNode>> {
-    let mut prev = None;
-    let mut curr = head;
-    while let Some(mut node) = curr {
-        curr = node.next.take(); // Move ownership of .next
-        node.next = prev;        // Rewire backward in-place
-        prev = Some(node);       // Advance prev owner
-    }
-    prev
-}`;
-    }
+  const nativeExtra = NATIVE_MULTI_LANG_CODE[familyId];
+  if (nativeExtra && nativeExtra[language]) {
+    return nativeExtra[language];
   }
 
-  if (familyId === 'two-sum-hash') {
-    if (language === 'cpp') {
-      return `#include <vector>
-#include <unordered_map>
-using namespace std;
-
-class Solution {
-public:
-    vector<int> twoSum(vector<int>& nums, int target) {
-        unordered_map<int, int> seen;
-        for (int i = 0; i < (int)nums.size(); i++) {
-            int comp = target - nums[i];
-            if (seen.count(comp)) {
-                return {seen[comp], i};
-            }
-            seen[nums[i]] = i;
-        }
-        return {};
-    }
-};`;
-    }
-    if (language === 'go') {
-      return `package main
-
-func twoSum(nums []int, target int) []int {
-    seen := make(map[int]int)
-    for i, num := range nums {
-        comp := target - num
-        if idx, ok := seen[comp]; ok {
-            return []int{idx, i}
-        }
-        seen[num] = i
-    }
-    return nil
-}`;
-    }
-    if (language === 'typescript') {
-      return `export function twoSum(nums: number[], target: number): number[] {
-  const seen = new Map<number, number>();
-  for (let i = 0; i < nums.length; i++) {
-    const comp = target - nums[i];
-    if (seen.has(comp)) {
-      return [seen.get(comp)!, i];
-    }
-    seen.set(nums[i], i);
-  }
-  return [];
-}`;
-    }
-    if (language === 'rust') {
-      return `use std::collections::HashMap;
-
-pub fn two_sum(nums: Vec<i32>, target: i32) -> Vec<i32> {
-    let mut seen = HashMap::new();
-    for (i, &num) in nums.iter().enumerate() {
-        let comp = target - num;
-        if let Some(&prev_idx) = seen.get(&comp) {
-            return vec![prev_idx as i32, i as i32];
-        }
-        seen.insert(num, i);
-    }
-    vec![]
-}`;
-    }
-  }
-
-  if (familyId === 'valid-parentheses-stack') {
-    if (language === 'cpp') {
-      return `#include <string>
-#include <stack>
-#include <unordered_map>
-using namespace std;
-
-class Solution {
-public:
-    bool isValid(string s) {
-        stack<char> st;
-        unordered_map<char, char> matching = {{')', '('}, {'}', '{'}, {']', '['}};
-        for (char ch : s) {
-            if (matching.count(ch)) {
-                if (st.empty() || st.top() != matching[ch]) return false;
-                st.pop();
-            } else {
-                st.push(ch);
-            }
-        }
-        return st.empty();
-    }
-};`;
-    }
-    if (language === 'go') {
-      return `package main
-
-func isValid(s string) bool {
-    st := []rune{}
-    matching := map[rune]rune{')': '(', '}': '{', ']': '['}
-    for _, ch := range s {
-        if open, exists := matching[ch]; exists {
-            if len(st) == 0 || st[len(st)-1] != open {
-                return false
-            }
-            st = st[:len(st)-1]
-        } else {
-            st = append(st, ch)
-        }
-    }
-    return len(st) == 0
-}`;
-    }
-    if (language === 'typescript') {
-      return `export function isValid(s: string): boolean {
-  const stack: string[] = [];
-  const map: Record<string, string> = { ')': '(', '}': '{', ']': '[' };
-  for (const ch of s) {
-    if (map[ch]) {
-      if (stack.pop() !== map[ch]) return false;
-    } else {
-      stack.push(ch);
-    }
-  }
-  return stack.length === 0;
-}`;
-    }
-    if (language === 'rust') {
-      return `pub fn is_valid(s: String) -> bool {
-    let mut stack = Vec::new();
-    for ch in s.chars() {
-        match ch {
-            '(' => stack.push(')'),
-            '{' => stack.push('}'),
-            '[' => stack.push(']'),
-            ')' | '}' | ']' => {
-                if stack.pop() != Some(ch) {
-                    return false;
-                }
-            }
-            _ => {}
-        }
-    }
-    stack.is_empty()
-}`;
-    }
-  }
-
-  if (familyId === 'container-most-water') {
-    if (language === 'cpp') {
-      return `#include <vector>
-#include <algorithm>
-using namespace std;
-
-class Solution {
-public:
-    int maxArea(vector<int>& height) {
-        int left = 0, right = (int)height.size() - 1;
-        int max_water = 0;
-        while (left < right) {
-            int w = right - left;
-            int h = min(height[left], height[right]);
-            max_water = max(max_water, w * h);
-            if (height[left] < height[right]) left++;
-            else right--;
-        }
-        return max_water;
-    }
-};`;
-    }
-    if (language === 'go') {
-      return `package main
-
-func maxArea(height []int) int {
-    left, right := 0, len(height)-1
-    maxWater := 0
-    for left < right {
-        w := right - left
-        h := height[left]
-        if height[right] < h {
-            h = height[right]
-        }
-        if area := w * h; area > maxWater {
-            maxWater = area
-        }
-        if height[left] < height[right] {
-            left++
-        } else {
-            right--
-        }
-    }
-    return maxWater
-}`;
-    }
-    if (language === 'typescript') {
-      return `export function maxArea(height: number[]): number {
-  let left = 0, right = height.length - 1;
-  let maxWater = 0;
-  while (left < right) {
-    const w = right - left;
-    const h = Math.min(height[left], height[right]);
-    maxWater = Math.max(maxWater, w * h);
-    if (height[left] < height[right]) left++;
-    else right--;
-  }
-  return maxWater;
-}`;
-    }
-    if (language === 'rust') {
-      return `pub fn max_area(height: Vec<i32>) -> i32 {
-    let (mut left, mut right) = (0usize, height.len().saturating_sub(1));
-    let mut max_water = 0;
-    while left < right {
-        let w = (right - left) as i32;
-        let h = height[left].min(height[right]);
-        max_water = max_water.max(w * h);
-        if height[left] < height[right] {
-            left += 1;
-        } else {
-            right = right.saturating_sub(1);
-        }
-    }
-    max_water
-}`;
-    }
-  }
-
-  // Generic idiomatic adapter for all other problems across C++20, Go, TypeScript, and Rust
-  if (language === 'cpp') {
-    return `// C++20 Zero-Allocation Pointer & Memory Implementation — ${problem.title}
-// Time: ${problem.python.timeComplexity} | Space: ${problem.python.spaceComplexity}
-#include <vector>
-#include <unordered_map>
-#include <algorithm>
-using namespace std;
-
-class Solution {
-public:
-    auto solve_${problem.slug.replace(/-/g, '_')}(vector<int>& nums, int target = 0) {
-        int left = 0, right = static_cast<int>(nums.size()) - 1;
-        int acc = 0;
-        while (left <= right) {
-            int mid = left + (right - left) / 2;
-            acc += nums[mid];
-            left++;
-            right--;
-        }
-        return acc;
-    }
-};`;
-  }
-
-  if (language === 'go') {
-    return `// Go 1.22 Systems Implementation — ${problem.title}
-// Time: ${problem.python.timeComplexity} | Space: ${problem.python.spaceComplexity}
-package main
-
-func Solve${problem.number}(nums []int, target int) int {
-    left, right := 0, len(nums)-1
-    acc := 0
-    for left <= right {
-        mid := left + (right-left)/2
-        acc += nums[mid]
-        left++
-        right--
-    }
-    return acc
-}`;
-  }
-
-  if (language === 'typescript') {
-    return `// TypeScript 5 Strict Implementation — ${problem.title}
-// Time: ${problem.python.timeComplexity} | Space: ${problem.python.spaceComplexity}
-export function solve${problem.number}(nums: number[], target = 0): number {
-  let left = 0;
-  let right = nums.length - 1;
-  let result = 0;
-  while (left <= right) {
-    const mid = (left + right) >>> 1;
-    result += nums[mid];
-    left++;
-    right--;
-  }
-  return result;
-}`;
-  }
-
-  return `// Rust 1.78 Ownership-Safe Implementation — ${problem.title}
-// Time: ${problem.python.timeComplexity} | Space: ${problem.python.spaceComplexity}
-pub fn solve_${problem.number}(nums: &[i32], _target: i32) -> i32 {
-    let (mut left, mut right) = (0usize, nums.len().saturating_sub(1));
-    let mut acc = 0;
-    while left < right {
-        let mid = left + (right - left) / 2;
-        acc += nums[mid];
-        left += 1;
-        right = right.saturating_sub(1);
-    }
-    acc
-}`;
+  return NATIVE_MULTI_LANG_CODE['reverse-linked-list'][language];
 }
 
 /**
@@ -612,6 +246,33 @@ export function computeComplexityDiff(
       bottleneck =
         'Recomputes overlapping sub-amounts exponentially instead of looking back in a 1D DP array.';
       break;
+    case 'sort-colors-dutch-flag':
+      bfName = 'Comparison Sort / Two-Pass Counting Buffer';
+      bfTime = 'O(N log N)';
+      bfSpace = 'O(N) Auxiliary Copy';
+      bfOps = Math.max(12, Math.round(n * Math.log2(n + 1) * 3));
+      bfBytes = n * 8 + 32;
+      bottleneck =
+        'Performs O(N log N) comparisons or requires multiple passes instead of partitioning 0/1/2 in a single in-place 3-pointer sweep.';
+      break;
+    case 'kadane-max-subarray':
+      bfName = 'Nested Start/End Subarray Enumeration';
+      bfTime = 'O(N²)';
+      bfSpace = 'O(1)';
+      bfOps = n * n;
+      bfBytes = actualBytes;
+      bottleneck =
+        'Re-sums every [i..j] subarray pair from scratch instead of discarding negative prefixes in O(N) single pass.';
+      break;
+    case 'merge-intervals-greedy':
+      bfName = 'All-Pairs Graph Connected Components';
+      bfTime = 'O(N²)';
+      bfSpace = 'O(N²) Overlap Graph';
+      bfOps = n * n * 2;
+      bfBytes = n * n * 8 + 32;
+      bottleneck =
+        'Checks overlap between every pair of intervals instead of sorting by start coordinate once and sweeping linearly.';
+      break;
     default:
       break;
   }
@@ -703,103 +364,44 @@ export function buildPredictQuestion(
 }
 
 /**
- * 3. Returns a realistic "Bug Hunter" challenge across all 6 languages.
+ * 3. Returns a realistic "Bug Hunter" challenge with real executable defects across all 6 languages.
  */
 export function getBugChallenge(problem: AlgorithmProblem): BugChallenge {
   const familyId = problem.traceFamilyId || problem.id;
-  const makeBuggy = (lang: Language) => {
-    const base = getMultiLanguageCode(problem, lang);
-    if (familyId === 'reverse-linked-list' && lang === 'python') {
-      return (
-        `# BUG HUNTER MODE: Spot the pointer order defect below\n` +
-        base.replace(
-          /nxt = curr\.next[^\n]*\n\s*curr\.next = prev/,
-          'curr.next = prev      # BUG: Overwrote curr.next before caching nxt!\n        nxt = curr.next'
-        )
-      );
-    }
-    if (familyId === 'reverse-linked-list' && lang === 'java') {
-      return (
-        `// BUG HUNTER MODE: Spot the pointer order defect below\n` +
-        base.replace(
-          /ListNode nxt = curr\.next;\s*\n\s*curr\.next = prev;/,
-          'curr.next = prev; // BUG: Overwrote curr.next before saving nxt!\n            ListNode nxt = curr.next;'
-        )
-      );
-    }
-    return (
-      `// BUG HUNTER MODE: Off-by-one boundary / pointer invariant defect\n` +
-      base.replace('<=', '<').replace('!= nullptr', '== nullptr')
-    );
-  };
+  const py = injectGenuineBug(familyId, 'python', getMultiLanguageCode(problem, 'python'));
+  const java = injectGenuineBug(familyId, 'java', getMultiLanguageCode(problem, 'java'));
+  const cpp = injectGenuineBug(familyId, 'cpp', getMultiLanguageCode(problem, 'cpp'));
+  const go = injectGenuineBug(familyId, 'go', getMultiLanguageCode(problem, 'go'));
+  const ts = injectGenuineBug(familyId, 'typescript', getMultiLanguageCode(problem, 'typescript'));
+  const rust = injectGenuineBug(familyId, 'rust', getMultiLanguageCode(problem, 'rust'));
 
   return {
-    bugTitle:
-      familyId === 'reverse-linked-list'
-        ? 'Orphaned Heap Chain (Missing nxt = curr.next Cache)'
-        : 'Boundary Pointer Off-By-One & Invariant Violation',
-    brokenLineNumber: familyId === 'reverse-linked-list' ? 10 : 6,
+    bugTitle: py.bugTitle,
+    brokenLineNumber: py.brokenLineNumber,
     buggyCodeByLang: {
-      python: makeBuggy('python'),
-      java: makeBuggy('java'),
-      cpp: makeBuggy('cpp'),
-      go: makeBuggy('go'),
-      typescript: makeBuggy('typescript'),
-      rust: makeBuggy('rust'),
+      python: py.code,
+      java: java.code,
+      cpp: cpp.code,
+      go: go.code,
+      typescript: ts.code,
+      rust: rust.code,
     },
-    symptom:
-      familyId === 'reverse-linked-list'
-        ? 'After flipping node 0 back to NULL, curr = curr.next jumps backward to NULL instead of advancing to node 1, losing the entire rest of the linked list on the heap.'
-        : 'Premature loop termination or skipped boundary index causes elements on the heap to be missed during pointer traversal.',
-    fixExplanation:
-      familyId === 'reverse-linked-list'
-        ? 'Always cache `nxt = curr.next` in a temporary stack register BEFORE mutating `curr.next = prev`.'
-        : 'Restore inclusive boundary comparison and initial pointer alignment so the loop invariant covers the full input span.',
+    symptom: py.symptom,
+    fixExplanation: py.fixExplanation,
   };
 }
 
 /**
- * 4. Runs 16 comprehensive sample + hidden edge-case inputs locally through the deterministic trace engine.
+ * 4. Runs problem-family-specific edge & stress test inputs through the deterministic trace engine
+ *    combined with real structural invariant verification (independent of comment text).
  */
 export function runLocalTestSuite(
   problem: AlgorithmProblem,
   code: string,
-  _language: Language
+  language: Language
 ): LocalTestCaseResult[] {
-  const hasBugMarker =
-    code.includes('BUG:') ||
-    code.includes('BUG HUNTER MODE') ||
-    code.includes('BLIND INTERVIEW MODE');
-  const isEmptyCode = code.trim().length < 25;
-
-  const baseSamples = problem.sampleInputs.map((s) => ({
-    category: 'Sample' as const,
-    label: s.label,
-    value: s.value,
-  }));
-
-  const extraEdgeCases: {
-    category: LocalTestCaseResult['category'];
-    label: string;
-    value: string;
-  }[] = [
-    { category: 'Boundary', label: 'Single Element / Node Boundary', value: '42' },
-    { category: 'Boundary', label: 'Two-Element Minimal Swap', value: '1 -> 2' },
-    { category: 'Boundary', label: 'Zero-Filled Uniform Input', value: '0, 0, 0, 0' },
-    { category: 'Negative / Dup', label: 'Negative Values & Sign Flip', value: '-10, -5, 0, 5, 10' },
-    { category: 'Negative / Dup', label: 'All-Duplicate Plateau', value: '7, 7, 7, 7, 7' },
-    { category: 'Negative / Dup', label: 'Alternating High/Low Peaks', value: '1, 9, 1, 9, 1, 9' },
-    { category: 'Stress', label: 'Strictly Increasing Sequence', value: '1, 2, 3, 4, 5, 6' },
-    { category: 'Stress', label: 'Strictly Decreasing Sequence', value: '9, 8, 6, 4, 2, 1' },
-    { category: 'Stress', label: 'Prime Number Distribution', value: '2, 3, 5, 7, 11, 13' },
-    { category: 'Stress', label: 'Fibonacci Growth Vector', value: '1, 1, 2, 3, 5, 8' },
-    { category: 'Boundary', label: 'Symmetric Palindromic Input', value: '4, 2, 1, 2, 4' },
-    { category: 'Boundary', label: 'Tail-Heavy Spike Vector', value: '1, 1, 1, 1, 25' },
-    { category: 'Stress', label: 'Head-Heavy Spike Vector', value: '25, 1, 1, 1, 1' },
-    { category: 'Stress', label: 'Max-Constraint Sparse Vector', value: '100, 1, 50, 2, 99, 3' },
-  ];
-
-  const combined = [...baseSamples, ...extraEdgeCases].slice(0, 16);
+  const structuralCheck = verifyCodeStructure(problem, code, language);
+  const combined = getFamilyTestInputs(problem);
 
   return combined.map((sample, idx) => {
     const steps = generateExecutionTrace(problem.id, sample.value);
@@ -808,23 +410,19 @@ export function runLocalTestSuite(
       lastStep?.stdout || `${lastStep?.title || 'Completed'} (${steps.length} steps)`;
     const peakHeapBytes = Math.max(...steps.map((s) => s.metrics.heapBytesUsed || 0), 16);
 
-    // If user injected a bug or hasn't completed blind starter code, boundary/stress cases expose the failure
-    const passed = !hasBugMarker && !isEmptyCode;
-
     return {
       id: `tc-${idx + 1}`,
       category: sample.category,
       label: sample.label,
       input: sample.value,
       expectedOutput,
-      actualOutput: passed
+      actualOutput: structuralCheck.passed
         ? expectedOutput
-        : hasBugMarker
-        ? `Invariant Failure at Step ${Math.min(2, steps.length)}: Pointer / Boundary mismatch`
-        : 'Incomplete implementation',
-      passed,
+        : structuralCheck.failureReason || 'Structural invariant violation detected',
+      passed: structuralCheck.passed,
       stepsCount: steps.length,
       peakHeapBytes,
+      checkedInvariant: structuralCheck.checkedInvariant,
     };
   });
 }
@@ -907,7 +505,8 @@ export function updateSpacedRepetition(
 }
 
 /**
- * 7. Evaluates a Mock Interview session across 5 Hiring Committee Rubric Dimensions (20 pts each = 100 pts).
+ * 7. Evaluates a Mock Interview session across 5 Hiring Committee Rubric Dimensions (20 pts each = 100 pts)
+ *    with honest stub detection, structural code verification, and rubric-calibrated communication scoring.
  */
 export function evaluateMockInterview(params: {
   companyName: string;
@@ -921,18 +520,82 @@ export function evaluateMockInterview(params: {
   const { companyName, problem, language, code, approachNotes, elapsedSeconds, quizCorrectCount } =
     params;
 
+  const structural = verifyCodeStructure(problem, code, language);
   const suite = runLocalTestSuite(problem, code, language);
-  const passedAll = suite.every((t) => t.passed);
+  const passedAll = structural.passed && suite.every((t) => t.passed);
   const elapsedMinutes = Math.max(1, Math.round(elapsedSeconds / 60));
 
-  const problemSolvingScore = passedAll ? 19 : 12;
-  const codeQualityScore = code.trim().length > 60 && passedAll ? 19 : 13;
-  const memoryMasteryScore = Math.min(20, 16 + quizCorrectCount * 2);
-  const complexityMentioned =
-    /O\(|pointer|heap|stack|invariant|space|time/i.test(approachNotes) ||
-    approachNotes.trim().length > 40;
-  const commScore = complexityMentioned ? 19 : approachNotes.trim().length > 10 ? 15 : 12;
-  const optimalComplexityScore = passedAll && elapsedMinutes <= 40 ? 19 : 14;
+  const codeWithoutComments = code
+    .replace(/\/\*[\s\S]*?\*\//g, '')
+    .replace(/\/\/[^\n]*/g, '')
+    .replace(/#[^\n]*/g, '')
+    .trim();
+  const executableLines = codeWithoutComments
+    .split('\n')
+    .map((l) => l.trim())
+    .filter((l) => l.length > 0 && l !== '{' && l !== '}' && l !== '};');
+
+  const isStubSubmission =
+    executableLines.length <= 4 ||
+    /\bpass\b/.test(codeWithoutComments) ||
+    /TODO:/i.test(code) ||
+    /return\s+null\s*;/.test(codeWithoutComments);
+
+  const notesTrimmed = approachNotes.trim();
+  const hasTimeBigO = /O\s*\([^)]+\)|linear|log\s*n|n\s*log\s*n/i.test(notesTrimmed);
+  const hasSpaceBigO = /space|O\s*\(\s*1\s*\)|O\s*\(\s*[ncvk]\s*\)|in-?place|heap|stack|auxiliary/i.test(
+    notesTrimmed
+  );
+  const hasInvariantOrEdge = /invariant|pointer|edge|empty|null|boundary|duplicate|overflow|cycle/i.test(
+    notesTrimmed
+  );
+
+  let problemSolvingScore: number;
+  let codeQualityScore: number;
+  let memoryMasteryScore: number;
+  let commScore: number;
+  let optimalComplexityScore: number;
+
+  if (isStubSubmission) {
+    problemSolvingScore = 4;
+    codeQualityScore = 3;
+    memoryMasteryScore = Math.min(8, 4 + quizCorrectCount * 2);
+    commScore =
+      notesTrimmed.length === 0
+        ? 3
+        : 6 + (hasTimeBigO ? 3 : 0) + (hasSpaceBigO ? 3 : 0) + (hasInvariantOrEdge ? 3 : 0);
+    optimalComplexityScore = 4;
+  } else {
+    problemSolvingScore = passedAll ? 19 : 9;
+    codeQualityScore = passedAll
+      ? executableLines.length >= 6
+        ? 19
+        : 16
+      : executableLines.length >= 6
+      ? 11
+      : 7;
+    memoryMasteryScore = passedAll
+      ? Math.min(20, 16 + quizCorrectCount * 2 + (hasSpaceBigO ? 2 : 0))
+      : Math.min(12, 8 + quizCorrectCount * 2);
+    commScore =
+      notesTrimmed.length === 0
+        ? 6
+        : Math.min(
+            20,
+            8 +
+              (notesTrimmed.length >= 30 ? 3 : 0) +
+              (hasTimeBigO ? 3 : 0) +
+              (hasSpaceBigO ? 3 : 0) +
+              (hasInvariantOrEdge ? 3 : 0)
+          );
+    optimalComplexityScore = passedAll
+      ? elapsedMinutes <= 35
+        ? 19
+        : elapsedMinutes <= 45
+        ? 17
+        : 14
+      : 8;
+  }
 
   const overallScore = Math.min(
     100,
@@ -943,51 +606,75 @@ export function evaluateMockInterview(params: {
       optimalComplexityScore
   );
 
-  const verdict: MockRubricScorecard['verdict'] =
-    overallScore >= 88
-      ? 'Strong Hire'
-      : overallScore >= 75
-      ? 'Hire'
-      : overallScore >= 62
-      ? 'Lean Hire'
-      : 'No Hire';
+  const verdict: MockRubricScorecard['verdict'] = isStubSubmission
+    ? 'No Hire'
+    : overallScore >= 88
+    ? 'Strong Hire'
+    : overallScore >= 76
+    ? 'Hire'
+    : overallScore >= 64
+    ? 'Lean Hire'
+    : 'No Hire';
 
   return {
+    id: `mock-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+    createdAt: new Date().toISOString().split('T')[0],
     companyName,
+    problemId: problem.id,
     problemTitle: problem.title,
     language,
     elapsedMinutes,
     verdict,
     overallScore,
+    isStubSubmission,
     dimensions: [
       {
         label: '1. Problem Solving & Edge-Case Rigor',
         score: problemSolvingScore,
-        notes: passedAll
-          ? `Passed all ${suite.length}/${suite.length} hidden & boundary test cases.`
-          : 'Failed boundary test cases; verify NULL head and off-by-one invariants.',
+        notes: isStubSubmission
+          ? 'No runnable solution submitted (blind starter stub detected). Complete the core algorithm before submitting.'
+          : passedAll
+          ? `Passed all ${suite.length}/${suite.length} domain & boundary test cases (${structural.checkedInvariant}).`
+          : structural.failureReason || 'Failed structural invariant checks; review loop bounds and edge cases.',
       },
       {
         label: '2. Code Quality & Idiomatic Syntax',
         score: codeQualityScore,
-        notes: `Evaluated in ${LANGUAGE_LABELS[language]} for clean variable naming and modular control flow.`,
+        notes: isStubSubmission
+          ? `Only ${executableLines.length} non-comment lines found in ${LANGUAGE_LABELS[language]} — incomplete placeholder.`
+          : `Evaluated ${executableLines.length} executable lines in ${LANGUAGE_LABELS[language]} for clarity and invariant hygiene.`,
       },
       {
         label: '3. Pointer & Memory Mastery',
         score: memoryMasteryScore,
-        notes: `Verified ${problem.python.spaceComplexity.split('—')[0].trim()} memory layout and stack/heap reference discipline.`,
+        notes: isStubSubmission
+          ? 'Unable to verify stack/heap pointer discipline on an unimplemented stub.'
+          : `Checked ${problem.python.spaceComplexity.split('—')[0].trim()} memory layout and stack/heap reference discipline.`,
       },
       {
         label: '4. Technical Communication',
         score: commScore,
-        notes: complexityMentioned
-          ? 'Articulated loop invariants and asymptotic trade-offs prior to implementation.'
-          : 'State explicit time/space bounds before writing code.',
+        notes:
+          notesTrimmed.length === 0
+            ? 'No pre-coding approach written. Always state time/space Big-O, loop invariants, and edge cases.'
+            : hasTimeBigO && hasSpaceBigO && hasInvariantOrEdge
+            ? 'Clearly articulated time/space complexity, loop invariants, and edge-case handling.'
+            : `Partial notes: add missing ${[
+                !hasTimeBigO ? 'time Big-O' : null,
+                !hasSpaceBigO ? 'space/memory analysis' : null,
+                !hasInvariantOrEdge ? 'loop invariants & edge cases' : null,
+              ]
+                .filter(Boolean)
+                .join(', ')}.`,
       },
       {
         label: '5. Optimal Time & Space Complexity',
         score: optimalComplexityScore,
-        notes: `Target ${problem.python.timeComplexity.split('—')[0].trim()} achieved within ${elapsedMinutes} min.`,
+        notes: isStubSubmission
+          ? 'Target complexity cannot be awarded without a working implementation.'
+          : passedAll
+          ? `Target ${problem.python.timeComplexity.split('—')[0].trim()} verified within ${elapsedMinutes} min.`
+          : 'Fix invariant defects before asymptotic optimality can be credited.',
       },
     ],
   };
